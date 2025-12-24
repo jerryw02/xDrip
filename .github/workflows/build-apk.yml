@@ -1,4 +1,4 @@
-name: Build xDrip APK (Step by Step)
+name: Ultimate Build Fix
 
 on: workflow_dispatch
 
@@ -8,49 +8,35 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # 获取完整历史，可能包含git描述需要
-        
-    - name: Fix git describe issue
+    
+    - name: Use system Gradle (绕过wrapper)
       run: |
-        # 修复 "fatal: No names found" 错误
-        git fetch --tags || true
-        git describe --tags --always --dirty=-dev 2>/dev/null || echo "v0.0.0-dev"
+        # 安装系统Gradle和Java
+        sudo apt-get update
+        sudo apt-get install -y gradle openjdk-11-jdk
         
-    - name: Set up Java 11
-      uses: actions/setup-java@v4
-      with:
-        java-version: '11'
-        distribution: 'temurin'
+        # 设置环境变量
+        export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
         
-    - name: Step 1 - Build libkeks module
+    - name: Direct Gradle build
       run: |
-        echo "=== 第一步: 构建libkeks模块 ==="
-        ./gradlew :libkeks:compileDebugJavaWithJavac :libkeks:generateDebugRFile \
-          --no-daemon --stacktrace --info || true
+        # 使用系统Gradle，完全绕过gradlew
+        echo "=== 直接使用系统Gradle构建 ==="
         
-    - name: Step 2 - Build localeapi module
-      run: |
-        echo "=== 第二步: 构建localeapi模块 ==="
-        ./gradlew :localeapi:compileDebugJavaWithJavac \
-          --no-daemon --stacktrace --info || true
+        # 创建gradle.properties
+        cat > gradle.properties << 'EOF'
+        org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError
+        android.enableJetifier=true
+        android.useAndroidX=true
+        EOF
         
-    - name: Step 3 - Build app module
-      run: |
-        echo "=== 第三步: 构建主应用模块 ==="
-        # 先尝试不包含数据绑定的构建
-        ./gradlew :app:compileProdDebugJavaWithJavac \
-          :app:generateProdDebugResources \
-          :app:generateProdDebugRFile \
-          --no-daemon --stacktrace --info
-        
-    - name: Step 4 - Full build
-      run: |
-        echo "=== 第四步: 完整构建 ==="
-        ./gradlew assembleProdDebug --no-daemon --stacktrace --info
+        # 直接构建
+        gradle clean
+        gradle assembleProdDebug --stacktrace
         
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: xDrip-StepByStep
+        name: Ultimate-Build-APK
         path: app/build/outputs/apk/prod/debug/*.apk
