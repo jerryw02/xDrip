@@ -12,48 +12,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-
+      
       - uses: actions/setup-java@v2
         with:
           java-version: 11
           distribution: adopt
-
-      - name: Ensure Gradle 8.0
-        run: |
-          mkdir -p gradle/wrapper
-          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-EOF
-
-      - name: Create gradle.properties
-        run: |
-          cat > gradle.properties << 'EOF'
-org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-org.gradle.daemon=false
-android.useAndroidX=true
-android.enableJetifier=true
-EOF
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-
+      
+      # 直接使用原配置，只修改构建参数
       - name: Build APKs
         uses: gradle/gradle-build-action@v2
         with:
-          arguments: |
-            clean 
-            assembleDebug 
-            assembleRelease 
-            --stacktrace 
-            --no-daemon
-
+          # 这里修改了：同时构建APK和运行测试
+          arguments: clean assembleDebug assembleRelease testProdReleaseUnitTest --stacktrace
+      
+      - name: Check Output
+        run: bash ./etc/CheckBuild/check-release.sh test
+      
       - name: Upload APKs
         uses: actions/upload-artifact@v2
         with:
-          name: xDrip-APKs
+          name: APK-files
           path: app/build/outputs/apk/
           retention-days: 90
