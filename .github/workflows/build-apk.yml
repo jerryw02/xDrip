@@ -1,8 +1,8 @@
-name: Build xDrip APK
+name: Build xDrip APK (Fixed)
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
@@ -10,52 +10,35 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Set up JDK 17 ★★★ 关键修改 ★★★
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 11 (使用Java 11，更兼容)
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '11'  # ★★★ 改为Java 11 ★★★
         distribution: 'temurin'
         
-    - name: Make gradlew executable
-      run: chmod +x gradlew
-      
-    - name: Cache Gradle dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        
-    - name: Setup Android SDK (简化的手动安装)
+    - name: Fix Gradle JVM args
       run: |
-        # 只安装必要的SDK组件，跳过复杂的setup-android
-        mkdir -p $HOME/android-sdk
-        export ANDROID_SDK_ROOT=$HOME/android-sdk
+        # 创建正确的gradle.properties
+        cat > gradle.properties << 'EOF'
+        org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -XX:+UseParallelGC
+        org.gradle.parallel=true
+        org.gradle.caching=true
+        EOF
         
-        # 安装Android SDK Command-line Tools（旧版本，兼容JDK 11）
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-        unzip -q commandlinetools-linux-11076708_latest.zip -d $ANDROID_SDK_ROOT
-        rm commandlinetools-linux-11076708_latest.zip
+        # 确保wrapper使用正确版本
+        sed -i 's/MaxPermSize=2048m//g' gradlew || true
         
-        # 设置环境变量
-        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-        echo "PATH=$ANDROID_SDK_ROOT/cmdline-tools/bin:$PATH" >> $GITHUB_ENV
+        chmod +x gradlew
         
-    - name: Accept licenses
+    - name: Build without daemon (避免守护进程问题)
       run: |
-        yes | $ANDROID_SDK_ROOT/cmdline-tools/bin/sdkmanager --licenses || true
+        # 使用--no-daemon避免JVM参数问题
+        ./gradlew assembleProdDebug --no-daemon --stacktrace
         
-    - name: Build APK
-      run: |
-        ./gradlew assembleProdDebug --stacktrace
-        
-    - name: Upload APK artifacts
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: xDrip-APK
+        name: xDrip-APK-Fixed
         path: app/build/outputs/apk/prod/debug/*.apk
-        retention-days: 30
