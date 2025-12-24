@@ -1,43 +1,61 @@
-name: Build xDrip Legacy APK
+name: Build xDrip APK
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04  # ★★★ 使用ubuntu-20.04，预装旧SDK ★★★
+    runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Use JDK 11
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 17 ★★★ 关键修改 ★★★
       uses: actions/setup-java@v4
       with:
-        java-version: '11'
+        java-version: '17'
         distribution: 'temurin'
         
-    - name: Setup Android environment
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+      
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        
+    - name: Setup Android SDK (简化的手动安装)
       run: |
-        # ubuntu-20.04已经预装了Android SDK，直接使用
-        export ANDROID_HOME=/usr/local/lib/android/sdk
-        export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+        # 只安装必要的SDK组件，跳过复杂的setup-android
+        mkdir -p $HOME/android-sdk
+        export ANDROID_SDK_ROOT=$HOME/android-sdk
         
-        # 强制接受所有许可证
-        mkdir -p $ANDROID_HOME/licenses
-        echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
-        echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
+        # 安装Android SDK Command-line Tools（旧版本，兼容JDK 11）
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+        unzip -q commandlinetools-linux-11076708_latest.zip -d $ANDROID_SDK_ROOT
+        rm commandlinetools-linux-11076708_latest.zip
         
-        chmod +x gradlew
+        # 设置环境变量
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "PATH=$ANDROID_SDK_ROOT/cmdline-tools/bin:$PATH" >> $GITHUB_ENV
         
-    - name: Build prodDebug APK
+    - name: Accept licenses
       run: |
-        ./gradlew assembleProdDebug --no-daemon --stacktrace
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/bin/sdkmanager --licenses || true
         
-    - name: Upload APK
+    - name: Build APK
+      run: |
+        ./gradlew assembleProdDebug --stacktrace
+        
+    - name: Upload APK artifacts
       uses: actions/upload-artifact@v4
       with:
         name: xDrip-APK
-        path: app/build/outputs/apk/prod/debug/app-prod-debug.apk
-        if-no-files-found: error
+        path: app/build/outputs/apk/prod/debug/*.apk
+        retention-days: 30
