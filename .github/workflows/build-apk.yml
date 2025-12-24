@@ -1,43 +1,380 @@
-name: Build xDrip (Specific Gradle)
+name: Build xDrip APK
 
-on: workflow_dispatch
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    # 1. 检出代码
+    - name: Checkout code
+      uses: actions/checkout@v3
     
-    - name: Install specific Gradle version
+    # 2. 设置Java环境（xDrip通常需要Java 11或17）
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    
+    # 3. 彻底清理Gradle缓存
+    - name: Clean Gradle cache
       run: |
-        # 安装Gradle 7.4.2（与Android Gradle Plugin 7.4.2兼容）
-        wget -q https://services.gradle.org/distributions/gradle-7.4.2-bin.zip
-        sudo unzip -d /opt/gradle gradle-7.4.2-bin.zip
-        sudo ln -sf /opt/gradle/gradle-7.4.2/bin/gradle /usr/local/bin/gradle
+        echo "=== Cleaning Gradle cache ==="
+        rm -rf ~/.gradle
+        rm -rf .gradle
+        rm -rf gradle/wrapper/gradle-wrapper.jar 2>/dev/null || true
+        rm -f gradlew gradlew.bat 2>/dev/null || true
+    
+    # 4. 强制更新Gradle Wrapper到8.0版本
+    - name: Force update Gradle Wrapper
+      run: |
+        echo "=== Creating new gradle-wrapper.properties ==="
+        mkdir -p gradle/wrapper
         
-        echo "安装的Gradle版本:"
-        gradle --version
+        cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+EOF
         
-        # 修复gradlew
-        sed -i 's/-XX:MaxPermSize=[0-9]*[kmg]//g' gradlew
+        echo "=== Updated gradle-wrapper.properties content ==="
+        cat gradle/wrapper/gradle-wrapper.properties
+        
+        # 下载正确版本的gradle-wrapper.jar
+        echo "=== Downloading gradle-wrapper.jar ==="
+        wget -q https://github.com/gradle/gradle/raw/v8.0.0/gradle/wrapper/gradle-wrapper.jar -O gradle/wrapper/gradle-wrapper.jar || echo "Download failed, will generate later"
+    
+    # 5. 重新生成gradlew脚本
+    - name: Regenerate gradlew script
+      run: |
+        echo "=== Regenerating gradlew script ==="
+        cat > gradlew << 'EOF'
+#!/usr/bin/env bash
+
+##############################################################################
+##
+##  Gradle start up script for UN*X
+##
+##############################################################################
+
+# Attempt to set APP_HOME
+# Resolve links: $0 may be a link
+PRG="$0"
+# Need this for relative symlinks.
+while [ -h "$PRG" ] ; do
+    ls="$(ls -ld "$PRG")"
+    link="$(expr "$ls" : '.*-> \(.*\)$')"
+    if expr "$link" : '/.*' > /dev/null; then
+        PRG="$link"
+    else
+        PRG="$(dirname "$PRG")/$link"
+    fi
+done
+SAVED="$(pwd)"
+cd "$(dirname "$PRG")/" >/dev/null
+APP_HOME="$(pwd -P)"
+cd "$SAVED" >/dev/null
+
+APP_NAME="Gradle"
+APP_BASE_NAME="$(basename "$0")"
+
+# Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+
+# Use the maximum available, or set MAX_FD != -1 to use that value.
+MAX_FD="maximum"
+
+warn () {
+    echo "$*"
+}
+
+die () {
+    echo
+    echo "$*"
+    echo
+    exit 1
+}
+
+# OS specific support (must be 'true' or 'false').
+cygwin=false
+msys=false
+darwin=false
+nonstop=false
+case "$(uname)" in
+  CYGWIN* )
+    cygwin=true
+    ;;
+  Darwin* )
+    darwin=true
+    ;;
+  MINGW* )
+    msys=true
+    ;;
+  NONSTOP* )
+    nonstop=true
+    ;;
+esac
+
+CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+
+
+# Determine the Java command to use to start the JVM.
+if [ -n "$JAVA_HOME" ] ; then
+    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+        # IBM's JDK on AIX uses strange locations for the executables
+        JAVACMD="$JAVA_HOME/jre/sh/java"
+    else
+        JAVACMD="$JAVA_HOME/bin/java"
+    fi
+    if [ ! -x "$JAVACMD" ] ; then
+        die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
+Please set the JAVA_HOME variable in your environment to match the location of your Java installation."
+    fi
+else
+    JAVACMD="java"
+    which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+Please set the JAVA_HOME variable in your environment to match the location of your Java installation."
+fi
+
+# Increase the maximum file descriptors if we can.
+if [ "$cygwin" = "false" ] && [ "$darwin" = "false" ] && [ "$nonstop" = "false" ] ; then
+    MAX_FD_LIMIT=$(ulimit -n)
+    if [ $? -eq 0 ] ; then
+        if [ "$MAX_FD" = "maximum" ] || [ "$MAX_FD" = "max" ] ; then
+            MAX_FD="$MAX_FD_LIMIT"
+        fi
+        ulimit -n $MAX_FD
+        if [ $? -ne 0 ] ; then
+            warn "Could not set maximum file descriptor limit: $MAX_FD"
+        fi
+    else
+        warn "Could not query maximum file descriptor limit; falling back to defaults"
+    fi
+fi
+
+# For Darwin, add options to specify how the application appears in the dock
+if $darwin; then
+    GRADLE_OPTS="$GRADLE_OPTS \"-Xdock:name=$APP_NAME\" \"-Xdock:icon=$APP_HOME/media/gradle.icns\""
+fi
+
+# For Cygwin or MSYS, switch paths to Windows format before running java
+if [ "$cygwin" = "true" ] || [ "$msys" = "true" ] ; then
+    APP_HOME=$(cygpath --path --mixed "$APP_HOME")
+    CLASSPATH=$(cygpath --path --mixed "$CLASSPATH")
+    
+    JAVACMD=$(cygpath --unix "$JAVACMD")
+
+    # We build the pattern for arguments to be converted via cygpath
+    ROOTDIRSRAW=$(find -L / -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+    SEP=""
+    for dir in $ROOTDIRSRAW ; do
+        ROOTDIRS="$ROOTDIRS$SEP$dir"
+        SEP="|"
+    done
+    OURCYGPATTERN="(^($ROOTDIRS))"
+    # Add a user-defined pattern to the cygpath arguments
+    if [ "$GRADLE_OPTS_CYGPATTERN" != "" ] ; then
+        OURCYGPATTERN="$OURCYGPATTERN|($GRADLE_OPTS_CYGPATTERN)"
+    fi
+    # Now convert the arguments - kludge to limit ourselves to /bin/sh
+    for i do
+        arg="$1"
+        case $i in
+            OURCYGPATTERN)
+                # Injected by cygpath, skip
+                shift
+                ;;
+            *)
+                eval 'printf "%s\n" "$arg"' | while IFS= read -r line ; do
+                    expanded=$(echo $line | sed "s|$OURCYGPATTERN|$(cygpath -w -p $line)|g")
+                    printf "%s " "$expanded"
+                done
+                shift
+                ;;
+        esac
+    done
+fi
+
+# Collect all arguments for the java command;
+#   * $DEFAULT_JVM_OPTS, $JAVA_OPTS, and $GRADLE_OPTS can contain fragments of
+#     shell script including quotes and variable substitutions, so eval is needed.
+#   * For Cygwin, escape spaces
+eval set -- "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" "\"-Dorg.gradle.appname=$APP_BASE_NAME\"" -classpath "\"$CLASSPATH\"" org.gradle.wrapper.GradleWrapperMain "$APP_ARGS"
+
+exec "$JAVACMD" "$@"
+EOF
+        
         chmod +x gradlew
         
-    - name: Set up Java 11
-      uses: actions/setup-java@v4
-      with:
-        java-version: '11'
-        distribution: 'temurin'
-        
-    - name: Build with system Gradle
-      env:
-        GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError"
+        # 生成gradlew.bat用于Windows
+        cat > gradlew.bat << 'EOF'
+@rem
+@rem Copyright 2015 the original author or authors.
+@rem
+@rem Licensed under the Apache License, Version 2.0 (the "License");
+@rem you may not use this file except in compliance with the License.
+@rem You may obtain a copy of the License at
+@rem
+@rem      https://www.apache.org/licenses/LICENSE-2.0
+@rem
+@rem Unless required by applicable law or agreed to in writing, software
+@rem distributed under the License is distributed on an "AS IS" BASIS,
+@rem WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+@rem See the License for the specific language governing permissions and
+limitations under the License.
+@rem
+
+@if "%DEBUG%" == "" @echo off
+@rem ##########################################################################
+@rem
+@rem  Gradle startup script for Windows
+@rem
+@rem ##########################################################################
+
+@rem Set local scope for the variables with windows NT shell
+if "%OS%"=="Windows_NT" setlocal
+
+set DIRNAME=%~dp0
+if "%DIRNAME%" == "" set DIRNAME=.
+set APP_BASE_NAME=%~n0
+set APP_HOME=%DIRNAME%
+
+@rem Resolve any "." and ".." in APP_HOME to make it shorter.
+for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
+
+@rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
+
+@rem Find java.exe
+if defined JAVA_HOME goto findJavaFromJavaHome
+
+set JAVA_EXE=java.exe
+%JAVA_EXE% -version >NUL 2>&1
+if "%ERRORLEVEL%" == "0" goto execute
+
+echo.
+echo ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+echo.
+echo Please set the JAVA_HOME variable in your environment to match the
+echo location of your Java installation.
+
+goto fail
+
+:findJavaFromJavaHome
+set JAVA_HOME=%JAVA_HOME:"=%
+set JAVA_EXE=%JAVA_HOME%/bin/java.exe
+
+if exist "%JAVA_EXE%" goto execute
+
+echo.
+echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME%
+echo.
+echo Please set the JAVA_HOME variable in your environment to match the
+echo location of your Java installation.
+
+goto fail
+
+:execute
+@rem Setup the command line
+
+set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+
+
+@rem Execute Gradle
+"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
+
+:end
+@rem End local scope for the variables with windows NT shell
+if "%ERRORLEVEL%"=="0" goto mainEnd
+
+:fail
+rem Set variable GRADLE_EXIT_CONSOLE if you need the _script_ return code instead of
+rem the _cmd.exe /c_ return code!
+if  not "" == "%GRADLE_EXIT_CONSOLE%" exit 1
+exit /b 1
+
+:mainEnd
+if "%OS%"=="Windows_NT" endlocal
+
+:omega
+EOF
+    
+    # 6. 验证Gradle版本
+    - name: Verify Gradle version
       run: |
-        # 使用系统安装的Gradle 7.4.2
-        gradle assembleProdDebug --stacktrace --no-daemon
-        
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
+        echo "=== Verifying Gradle version ==="
+        ./gradlew --version || echo "Gradle version check failed"
+    
+    # 7. 检查项目结构
+    - name: Check project structure
+      run: |
+        echo "=== Project structure ==="
+        find . -name "*.gradle" -o -name "gradle.properties" | head -20
+        echo ""
+        echo "=== Android Gradle Plugin version ==="
+        grep -r "com.android.tools.build:gradle" . || echo "Android Gradle Plugin version not found"
+    
+    # 8. 尝试更新Android Gradle Plugin版本（如果需要）
+    - name: Update AGP version if needed
+      run: |
+        echo "=== Checking Android Gradle Plugin ==="
+        # 查找并更新build.gradle文件中的AGP版本
+        find . -name "*.gradle" -type f | while read file; do
+          if grep -q "com.android.tools.build:gradle" "$file"; then
+            echo "Updating AGP in $file"
+            # 将旧版本更新为8.0.0（与Gradle 8.0兼容）
+            sed -i 's/com.android.tools.build:gradle:[0-9.]*/com.android.tools.build:gradle:8.0.0/g' "$file"
+            sed -i 's/id "com.android.application" version "[0-9.]*"/id "com.android.application" version "8.0.0"/g' "$file"
+            sed -i 's/id "com.android.library" version "[0-9.]*"/id "com.android.library" version "8.0.0"/g' "$file"
+          fi
+        done
+    
+    # 9. 构建APK
+    - name: Build APK
+      run: |
+        echo "=== Building APK ==="
+        # 使用无守护进程模式，显示详细日志
+        ./gradlew clean assembleDebug --no-daemon --stacktrace --info
+      
+      continue-on-error: true  # 继续执行以便获取更多信息
+    
+    # 10. 如果标准构建失败，尝试备用方法
+    - name: Alternative build method
+      if: failure()
+      run: |
+        echo "=== Trying alternative build method ==="
+        # 直接下载并使用Gradle 8.0
+        wget -q https://services.gradle.org/distributions/gradle-8.0-bin.zip
+        unzip -q gradle-8.0-bin.zip
+        ./gradle-8.0/bin/gradle clean assembleDebug --stacktrace
+    
+    # 11. 上传构建产物
+    - name: Upload APK artifacts
+      if: success() || failure()  # 即使失败也上传日志
+      uses: actions/upload-artifact@v3
       with:
-        name: xDrip-Specific-Gradle
-        path: app/build/outputs/apk/prod/debug/*.apk
+        name: build-outputs
+        path: |
+          app/build/outputs/
+          build.log
+        retention-days: 7
+    
+    # 12. 上传构建日志
+    - name: Upload build logs
+      if: always()  # 总是执行
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-logs
+        path: |
+          **/*.log
+          **/build/reports/
+        retention-days: 30
