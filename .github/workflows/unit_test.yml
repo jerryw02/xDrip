@@ -11,26 +11,29 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java-version: 
+        java-version: [ 11 ]
 
     steps:
-    - uses: actions/checkout@v2
+    # 注意这里强制使用 v3
+    - uses: actions/checkout@v3
     
-    - uses: actions/setup-java@v2
+    # 注意这里强制使用 v3
+    - uses: actions/setup-java@v3
       with:
         java-version: ${{ matrix.java-version }}
-        distribution: adopt
-        
+        distribution: 'adopt'
+
     - name: Run unit tests and assemble APKs
       uses: gradle/gradle-build-action@v2
       with:
         arguments: assembleProdRelease testProdReleaseUnitTest
-        
+
     - name: Check Output
       run: bash ./etc/CheckBuild/check-release.sh test
 
-    # ================== 新增的代码从这里开始 ==================
+    # ================== 上传 APK (关键修复点) ==================
     - name: Upload APK
+      # 强制指定版本为 @v3
       uses: actions/upload-artifact@v3
       with:
         name: xDrip-Apk
