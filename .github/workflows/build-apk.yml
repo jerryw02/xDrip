@@ -1,50 +1,43 @@
-name: Build APK
+name: Build xDrip-APK
 
 on:
-  push:
-    branches: [master, main]
-  pull_request:
-    branches: [master, main]
+  workflow_dispatch:
+#on:
+#  push:
+#    branches: [ master ]
+#  pull_request:
+#    branches: [ master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: [ 11 ]
 
     steps:
-      - uses: actions/checkout@v2
+    # 1. 使用明确版本的 checkout
+    - uses: actions/checkout@v4 # 使用最新的 v4
+    
+    - uses: actions/setup-java@v4
+      with:
+        java-version: ${{ matrix.java-version }}
+        distribution: 'temurin' # 'adopt' 已过时，建议使用 'temurin'
 
-      - uses: actions/setup-java@v2
-        with:
-          java-version: 11
-          distribution: adopt
+    # 2. 手动执行 Gradle 命令，而不是使用 gradle-build-action
+    # 这是为了避免那个 Action 内部可能隐式调用旧版 upload-artifact
+    - name: Make Gradle Executable
+      run: chmod +x gradlew
 
-      - name: Update Gradle to 8.0
-        run: |
-          mkdir -p gradle/wrapper
-          echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
-          echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
-          echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip" >> gradle/wrapper/gradle-wrapper.properties
-          echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
-          echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+    - name: Build APK (Assemble)
+      run: ./gradlew assembleProdDebug
 
-      - name: Create gradle.properties
-        run: |
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > gradle.properties
-          echo "org.gradle.daemon=false" >> gradle.properties
-          echo "android.useAndroidX=true" >> gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-
-      - name: Build APKs
-        uses: gradle/gradle-build-action@v2
-        with:
-          arguments: clean assembleDebug assembleRelease --stacktrace --no-daemon
-
-      - name: Upload APKs
-        uses: actions/upload-artifact@v2
-        with:
-          name: xDrip-APKs
-          path: app/build/outputs/apk/
-          retention-days: 90
+    # 3. 关键：强制使用最新的 upload-artifact
+    - name: Upload APK
+      # 强制锁定版本
+      uses: actions/upload-artifact@v4
+      with:
+        name: xDrip-Apk
+        path: app/build/outputs/apk/prod/debug/*.apk
+        # 如果文件路径不存在也不要报错，防止卡住
+        if-no-files-found: warn 
