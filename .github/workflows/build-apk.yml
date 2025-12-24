@@ -1,167 +1,27 @@
-name: Build xDrip APK
+name: Simple APK Build
 
-on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
-  workflow_dispatch: # 允许手动触发
+on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-      # 1. 检出代码
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
       
-      # 2. 设置Java环境
-      - name: Setup Java
+      - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
       
-      # 3. 彻底清理Gradle缓存
-      - name: Clean Gradle cache
+      - name: Fix Gradle version
         run: |
-          echo "=== Cleaning Gradle cache ==="
-          rm -rf ~/.gradle
-          rm -rf .gradle
-          rm -rf gradle/wrapper/gradle-wrapper.jar 2>/dev/null || true
-          rm -f gradlew gradlew.bat 2>/dev/null || true
+          sed -i 's/gradle-[0-9.]*-bin\.zip/gradle-8.0-all.zip/g' gradle/wrapper/gradle-wrapper.properties
+          sed -i 's/gradle-[0-9.]*-all\.zip/gradle-8.0-all.zip/g' gradle/wrapper/gradle-wrapper.properties
       
-      # 4. 强制更新Gradle Wrapper到8.0版本
-      - name: Force update Gradle Wrapper
-        run: |
-          echo "=== Creating new gradle-wrapper.properties ==="
-          mkdir -p gradle/wrapper
-          
-          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-EOF
-          
-          echo "=== Updated gradle-wrapper.properties content ==="
-          cat gradle/wrapper/gradle-wrapper.properties
-          
-          # 下载正确版本的gradle-wrapper.jar
-          echo "=== Downloading gradle-wrapper.jar ==="
-          wget -q https://repo.maven.apache.org/maven2/org/elasticsearch/gradle/gradle-wrapper/8.0.0/gradle-wrapper-8.0.0.jar -O gradle/wrapper/gradle-wrapper.jar || echo "Download failed, will generate later"
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
       
-      # 5. 重新生成gradlew脚本（简化版）
-      - name: Regenerate gradlew script
-        run: |
-          echo "=== Regenerating gradlew script ==="
-          
-          # 下载一个标准的gradlew脚本
-          curl -s -o gradlew https://raw.githubusercontent.com/gradle/gradle/master/gradlew
-          chmod +x gradlew
-          
-          # 生成gradlew.bat
-          curl -s -o gradlew.bat https://raw.githubusercontent.com/gradle/gradle/master/gradlew.bat
-      
-      # 6. 验证Gradle版本
-      - name: Verify Gradle version
-        run: |
-          echo "=== Verifying Gradle version ==="
-          ls -la gradle/wrapper/
-          cat gradle/wrapper/gradle-wrapper.properties
-      
-      # 7. 检查项目结构
-      - name: Check project structure
-        run: |
-          echo "=== Project structure ==="
-          find . -name "*.gradle" -o -name "gradle.properties" | head -10
-          echo ""
-          echo "=== Checking build.gradle files ==="
-          for file in $(find . -name "*.gradle" -type f); do
-            echo "=== $file ==="
-            head -30 "$file"
-            echo ""
-          done
-      
-      # 8. 尝试修复可能的构建问题
-      - name: Fix potential build issues
-        run: |
-          echo "=== Fixing potential issues ==="
-          
-          # 创建或更新gradle.properties
-          cat >> gradle.properties << 'EOF'
-org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-android.useAndroidX=true
-android.enableJetifier=true
-org.gradle.parallel=true
-org.gradle.caching=true
-EOF
-          
-          # 确保本地属性文件存在
-          if [ ! -f local.properties ]; then
-            echo "# Local properties" > local.properties
-            echo "sdk.dir=/usr/local/lib/android/sdk" >> local.properties
-          fi
-      
-      # 9. 设置Android SDK
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-      
-      # 10. 接受Android SDK许可证
-      - name: Accept Android SDK licenses
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --update
-      
-      # 11. 构建APK（主要方法）
-      - name: Build APK with gradlew
-        run: |
-          echo "=== Building APK with gradlew ==="
-          # 使用无守护进程模式，显示详细日志
-          ./gradlew clean assembleDebug --no-daemon --stacktrace --info
-        continue-on-error: true
-      
-      # 12. 备用构建方法
-      - name: Build APK with direct Gradle
-        if: failure()
-        run: |
-          echo "=== Trying alternative build method ==="
-          # 直接下载并使用Gradle 8.0
-          wget -q https://services.gradle.org/distributions/gradle-8.0-bin.zip
-          unzip -q gradle-8.0-bin.zip
-          export PATH=$PWD/gradle-8.0/bin:$PATH
-          gradle clean assembleDebug --stacktrace
-      
-      # 13. 查找APK文件
-      - name: Find APK files
-        if: always()
-        run: |
-          echo "=== Searching for APK files ==="
-          find . -name "*.apk" -type f 2>/dev/null | while read apk; do
-            echo "Found APK: $apk"
-            ls -la "$apk"
-          done || echo "No APK files found"
-      
-      # 14. 上传APK产物
-      - name: Upload APK artifacts
-        if: success()
-        uses: actions/upload-artifact@v3
-        with:
-          name: apk-files
-          path: |
-            **/*.apk
-            **/build/outputs/
-          retention-days: 7
-      
-      # 15. 上传构建日志
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: build-logs
-          path: |
-            **/*.log
-            **/build/reports/
-          retention-days: 30
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug
