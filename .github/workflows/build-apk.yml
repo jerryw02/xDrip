@@ -1,4 +1,4 @@
-name: Ultimate Build Fix
+name: Build xDrip (Specific Gradle)
 
 on: workflow_dispatch
 
@@ -9,34 +9,35 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Use system Gradle (绕过wrapper)
+    - name: Install specific Gradle version
       run: |
-        # 安装系统Gradle和Java
-        sudo apt-get update
-        sudo apt-get install -y gradle openjdk-11-jdk
+        # 安装Gradle 7.4.2（与Android Gradle Plugin 7.4.2兼容）
+        wget -q https://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+        sudo unzip -d /opt/gradle gradle-7.4.2-bin.zip
+        sudo ln -sf /opt/gradle/gradle-7.4.2/bin/gradle /usr/local/bin/gradle
         
-        # 设置环境变量
-        export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+        echo "安装的Gradle版本:"
+        gradle --version
         
-    - name: Direct Gradle build
+        # 修复gradlew
+        sed -i 's/-XX:MaxPermSize=[0-9]*[kmg]//g' gradlew
+        chmod +x gradlew
+        
+    - name: Set up Java 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        
+    - name: Build with system Gradle
+      env:
+        GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError"
       run: |
-        # 使用系统Gradle，完全绕过gradlew
-        echo "=== 直接使用系统Gradle构建 ==="
-        
-        # 创建gradle.properties
-        cat > gradle.properties << 'EOF'
-        org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError
-        android.enableJetifier=true
-        android.useAndroidX=true
-        EOF
-        
-        # 直接构建
-        gradle clean
-        gradle assembleProdDebug --stacktrace
+        # 使用系统安装的Gradle 7.4.2
+        gradle assembleProdDebug --stacktrace --no-daemon
         
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Ultimate-Build-APK
+        name: xDrip-Specific-Gradle
         path: app/build/outputs/apk/prod/debug/*.apk
