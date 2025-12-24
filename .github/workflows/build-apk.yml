@@ -18,19 +18,23 @@ jobs:
           java-version: 11
           distribution: adopt
       
-      # 直接使用原配置，只修改构建参数
-      - name: Build APKs
+      # 修改Gradle版本为8.0
+      - name: Update Gradle version
+        run: |
+          sed -i 's|distributionUrl=.*|distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip|g' gradle/wrapper/gradle-wrapper.properties
+      
+      # 修改构建参数来构建APK而不是只运行测试
+      - name: Build APKs and run tests
         uses: gradle/gradle-build-action@v2
         with:
-          # 这里修改了：同时构建APK和运行测试
           arguments: clean assembleDebug assembleRelease testProdReleaseUnitTest --stacktrace
       
       - name: Check Output
         run: bash ./etc/CheckBuild/check-release.sh test
       
-      - name: Upload APKs
+      # 新增：上传APK
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v2
         with:
           name: APK-files
           path: app/build/outputs/apk/
-          retention-days: 90
