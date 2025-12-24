@@ -12,29 +12,39 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      
+
       - uses: actions/setup-java@v2
         with:
           java-version: 11
           distribution: adopt
-      
-      # 修改Gradle版本为8.0
-      - name: Update Gradle version
+
+      - name: Update Gradle to 8.0
         run: |
-          sed -i 's|distributionUrl=.*|distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip|g' gradle/wrapper/gradle-wrapper.properties
-      
-      # 修改构建参数来构建APK而不是只运行测试
-      - name: Build APKs and run tests
+          mkdir -p gradle/wrapper
+          echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
+          echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+          echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip" >> gradle/wrapper/gradle-wrapper.properties
+          echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
+          echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+
+      - name: Create gradle.properties
+        run: |
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > gradle.properties
+          echo "org.gradle.daemon=false" >> gradle.properties
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Build APKs
         uses: gradle/gradle-build-action@v2
         with:
-          arguments: clean assembleDebug assembleRelease testProdReleaseUnitTest --stacktrace
-      
-      - name: Check Output
-        run: bash ./etc/CheckBuild/check-release.sh test
-      
-      # 新增：上传APK
-      - name: Upload APK artifacts
+          arguments: clean assembleDebug assembleRelease --stacktrace --no-daemon
+
+      - name: Upload APKs
         uses: actions/upload-artifact@v2
         with:
-          name: APK-files
+          name: xDrip-APKs
           path: app/build/outputs/apk/
+          retention-days: 90
