@@ -1,27 +1,152 @@
-name: Simple APK Build
+name: Build APK
 
-on: [push]
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:  # 手动触发
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
+    strategy:
+      matrix:
+        java-version: [ 11, 17 ]  # 支持两种Java版本
+
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-      
-      - name: Fix Gradle version
-        run: |
-          sed -i 's/gradle-[0-9.]*-bin\.zip/gradle-8.0-all.zip/g' gradle/wrapper/gradle-wrapper.properties
-          sed -i 's/gradle-[0-9.]*-all\.zip/gradle-8.0-all.zip/g' gradle/wrapper/gradle-wrapper.properties
-      
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-      
-      - name: Build with Gradle
-        run: ./gradlew assembleDebug
+    - uses: actions/checkout@v2
+    
+    - uses: actions/setup-java@v2
+      with:
+        java-version: ${{ matrix.java-version }}
+        distribution: adopt
+    
+    # 根据你的项目，可能已经有这个配置了，先检查
+    - name: Check Gradle configuration
+      run: |
+        echo "=== Current gradle-wrapper.properties ==="
+        cat gradle/wrapper/gradle-wrapper.properties || echo "File not found"
+        echo ""
+        echo "=== Checking for gradle.properties ==="
+        cat gradle.properties 2>/dev/null || echo "No gradle.properties found"
+    
+    # 如果Gradle版本有问题，自动修复
+    - name: Fix Gradle version if needed
+      run: |
+        # 检查当前Gradle版本
+        CURRENT_VERSION=$(grep -o 'gradle-[0-9.]*' gradle/wrapper/gradle-wrapper.properties | head -1 | sed 's/gradle-//')
+        echo "Current Gradle version: $CURRENT_VERSION"
+        
+        # 如果版本低于7.5，更新到8.0
+        if [[ "$CURRENT_VERSION" < "7.5" ]]; then
+          echo "Updating Gradle to 8.0 (minimum required is 7.5)"
+          sed -i 's|distributionUrl=.*|distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-all.zip|g' gradle/wrapper/gradle-wrapper.properties
+        fi
+        
+        echo "=== Updated gradle-wrapper.properties ==="
+        cat gradle/wrapper/gradle-wrapper.properties
+    
+    # 确保有正确的gradle.properties
+    - name: Setup Gradle properties
+      run: |
+        # 创建或更新gradle.properties
+        cat > gradle.properties << 'EOF'
+# Java VM settings
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+org.gradle.daemon=false
+
+# Android settings
+android.useAndroidX=true
+android.enableJetifier=true
+
+# Build performance
+org.gradle.parallel=true
+org.gradle.caching=true
+org.gradle.configureondemand=true
+
+# CI specific
+android.enablePreDex=false
+EOF
+        
+        # 确保本地属性存在
+        if [ ! -f local.properties ]; then
+          echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
+        fi
+    
+    # 设置Android SDK（如果需要）
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v2
+      with:
+        accept-android-licenses: true
+    
+    # 主构建步骤 - 构建所有类型的APK
+    - name: Build all APKs
+      uses: gradle/gradle-build-action@v2
+      with:
+        arguments: |
+          clean 
+          assembleDebug 
+          assembleRelease 
+          assembleProdRelease 
+          --stacktrace 
+          --no-daemon
+        cache-read-only: false
+    
+    # 可选：如果项目有特定的变体，可以构建更多
+    - name: Build specific variants (optional)
+      if: false  # 默认禁用，需要时启用
+      uses: gradle/gradle-build-action@v2
+      with:
+        arguments: |
+          assembleFullDebug
+          assembleFullRelease
+          assembleProdDebug
+          assembleProdRelease
+          --stacktrace
+          --no-daemon
+    
+    # 列出所有生成的APK文件
+    - name: List generated APKs
+      run: |
+        echo "=== All APK files ==="
+        find . -name "*.apk" -type f 2>/dev/null | while read apk; do
+          SIZE=$(du -h "$apk" | cut -f1)
+          echo "📱 $apk ($SIZE)"
+          ls -la "$apk"
+        done || echo "No APK files found"
+        
+        echo ""
+        echo "=== APK directory structure ==="
+        find app/build/outputs/apk -type f 2>/dev/null || echo "No APK outputs found"
+    
+    # 收集并上传APK文件
+    - name: Upload APK artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: apk-files-java-${{ matrix.java-version }}
+        path: |
+          app/build/outputs/apk/
+          **/*.apk
+        retention-days: 30
+    
+    # 收集构建报告
+    - name: Upload build reports
+      uses: actions/upload-artifact@v2
+      with:
+        name: build-reports-java-${{ matrix.java-version }}
+        path: |
+          app/build/reports/
+          build/reports/
+        retention-days: 30
+    
+    # 运行单元测试（保持原有功能）
+    - name: Run unit tests
+      uses: gradle/gradle-build-action@v2
+      with:
+        arguments: testProdReleaseUnitTest --stacktrace --no-daemon
+    
+    # 运行检查脚本（保持原有功能）
+    - name: Check Output
+      run: bash ./etc/CheckBuild/check-release.sh test
