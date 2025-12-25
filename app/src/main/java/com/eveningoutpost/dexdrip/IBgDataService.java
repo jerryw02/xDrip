@@ -4,6 +4,7 @@ import android.os.IBinder;
 import android.os.IInterface;
 import android.os.Parcel;
 import android.os.RemoteException;
+import com.eveningoutpost.dexdrip.BgData;
 
 public interface IBgDataService extends IInterface {
     void updateBgData(BgData data) throws RemoteException;
