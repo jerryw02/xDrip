@@ -47,5 +47,5 @@ public class BgData implements Parcelable {
         public BgData[] newArray(int size) {
             return new BgData[size];
         }
-    }
+    ；}
 }
