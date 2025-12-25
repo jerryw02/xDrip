@@ -44,7 +44,7 @@ public class BgDataService extends Service {
                 mCallbacks.unregister(callback);
             }
         }
-    };
+    }
 
     // 使用 RemoteCallbackList 管理回调列表，自动处理客户端死亡
     private final RemoteCallbackList<IBgDataCallback> mCallbacks = new RemoteCallbackList<>();
