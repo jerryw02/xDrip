@@ -892,6 +892,16 @@
             android:name=".watch.thinjam.BlueJayService"
             android:foregroundServiceType="connectedDevice|location" />
         <service android:name=".cgm.webfollow.WebFollowService" />
+
+        <service
+            android:name=".BgDataService"
+            android:enabled="true"
+            android:exported="true"> <!-- exported=true 允许其他 App 绑定 -->
+            <intent-filter>
+                <action android:name="com.eveningoutpost.dexdrip.BIND_BG_SERVICE" /> <!-- 定义一个 Action -->
+            </intent-filter>
+        </service>
+        
     </application>
 
 </manifest>
