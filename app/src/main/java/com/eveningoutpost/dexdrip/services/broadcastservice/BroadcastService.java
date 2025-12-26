@@ -1,6 +1,5 @@
 package com.eveningoutpost.dexdrip.services.broadcastservice;
 
-import com.eveningoutpost.dexdrip.services.broadcastservice.BgDataSender;
 import com.eveningoutpost.dexdrip.IBgDataService; // 替换为你的 AIDL 接口的实际包名
 import android.content.ServiceConnection;
 
