@@ -33,11 +33,11 @@ import com.eveningoutpost.dexdrip.utilitymodels.BgSparklineBuilder;
 import com.eveningoutpost.dexdrip.utilitymodels.Pref;
 import com.eveningoutpost.dexdrip.utils.PowerStateReceiver;
 import com.eveningoutpost.dexdrip.xdrip;
-import com.huami.watch.transport.DataBundle;
-import com.huami.watch.transport.DataTransportResult;
-import com.huami.watch.transport.TransportDataItem;
-import com.kieronquinn.library.amazfitcommunication.Transporter;
-import com.kieronquinn.library.amazfitcommunication.TransporterClassic;
+//import com.huami.watch.transport.DataBundle;
+//import com.huami.watch.transport.DataTransportResult;
+//import com.huami.watch.transport.TransportDataItem;
+//import com.kieronquinn.library.amazfitcommunication.Transporter;
+//import com.kieronquinn.library.amazfitcommunication.TransporterClassic;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -476,6 +476,7 @@ public class Amazfitservice extends Service {
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
         return Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT);
     }
+
 
 
 }
