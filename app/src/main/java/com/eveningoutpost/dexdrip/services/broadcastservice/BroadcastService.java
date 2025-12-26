@@ -230,6 +230,16 @@ public class BroadcastService extends Service {
         return null;
     }
 
+    private IBgDataCallback mAapsCallback = new IBgDataCallback.Stub() {
+        @Override
+        public void onBgDataReceived(BgData data) throws RemoteException {
+            // 在这里处理从 AAPS 接收到的数据
+            Log.d("BroadcastService", "从 AAPS 接收到血糖数据: " + data.value + " at " + data.timestamp);
+            // 你可以在这里添加处理逻辑，例如更新 UI 或触发其他操作
+        }
+        // IBgDataCallback.aidl 中没有其他方法，所以这里不需要实现别的
+    };
+    
     // 在 BroadcastService 类中添加
     private IBgDataService mAapsService;
     private ServiceConnection mAapsConnection = new ServiceConnection() {
