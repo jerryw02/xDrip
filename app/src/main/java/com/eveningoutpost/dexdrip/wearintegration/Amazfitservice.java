@@ -16,7 +16,12 @@ public class Amazfitservice extends Service {
         return null;
     }
 
-    // 可以添加一个静态方法来满足其他类可能的调用，但不执行任何操作
+    // 提供一个接受单个 String 参数的 start 方法，以匹配调用它的代码
+    public static void start(String action_text) {
+        // Do nothing
+    }
+
+    // 也保留原始的 3 参数方法，以防有其他地方调用
     public static void start(String action_text, String alert_name, int snooze_time) {
         // Do nothing
     }
