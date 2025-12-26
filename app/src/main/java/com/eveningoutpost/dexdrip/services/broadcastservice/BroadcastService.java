@@ -222,6 +222,33 @@ public class BroadcastService extends Service {
         return null;
     }
 
+    // 在 BroadcastService 类中添加
+    private IBgDataService mAapsService;
+    private ServiceConnection mAapsConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.d("BroadcastService", "成功连接到 AAPS 服务");
+            mAapsService = IBgDataService.Stub.asInterface(service);
+            try {
+                mAapsService.registerCallback(mAapsCallback); // 如果需要反向回调，可以实现
+            } catch (RemoteException e) {
+                Log.e("BroadcastService", "注册 AAPS 回调失败", e);
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.e("BroadcastService", "AAPS 服务断开连接");
+            mAapsService = null;
+        }
+    };
+
+    private void bindToAapsService() {
+        Intent intent = new Intent();
+        intent.setClassName("com.your.aaps.package", "com.your.aaps.package.BgReceiverService"); // AAPS 的包名和服务名
+        bindService(intent, mAapsConnection, Context.BIND_AUTO_CREATE);
+    }
+    
     /**
      * When service started it's will send a broadcast message CMD_START for thirdparty
      * applications and waiting for commands from applications by listening broadcastReceiver.
@@ -236,6 +263,7 @@ public class BroadcastService extends Service {
         JoH.startService(BroadcastService.class, Const.INTENT_FUNCTION_KEY, Const.CMD_START);
 
         super.onCreate();
+        bindToAapsService(); // 调用绑定方法
     }
 
     @Override
@@ -244,6 +272,16 @@ public class BroadcastService extends Service {
         broadcastEntities.clear();
         unregisterReceiver(broadcastReceiver);
         super.onDestroy();
+
+        if (mAapsService != null) {
+            try {
+                mAapsService.unregisterCallback(mAapsCallback); // 注销回调
+            } catch (RemoteException e) {
+                Log.e("BroadcastService", "注销 AAPS 回调失败", e);
+            }
+            unbindService(mAapsConnection);
+        }
+        
     }
 
     @Override
@@ -561,6 +599,32 @@ public class BroadcastService extends Service {
             bundle.putString("external.statusLine", getLastStatusLine());
             bundle.putLong("external.timeStamp", getLastStatusLineTime());
 
+            // --- 新增：通过 AIDL 发送给 AAPS ---
+            // 确保 mAapsService 是在 Service 类中定义的全局变量，并在适当时候绑定
+            if (mAapsService != null) { 
+                try {
+                    // 创建 AIDL 需要的 BgData 对象
+                    // 注意：你需要根据 bundle 中实际使用的单位来决定是否需要转换
+                    // 这里假设 bundle.putDouble("bg_value", bgValue) 已经在上面的代码中执行
+                    // 或者直接使用从 dg/bgReading 获取的原始值
+                    BgData aidlData = new BgData(
+                        bgValue,          // 血糖值
+                        deltaName,        // 趋势 (如 "UP", "DOWN")
+                        timeStamp,        // 时间戳
+                        plugin.isEmpty() ? "xDrip" : plugin // 来源
+                    );
+                    mAapsService.updateBgData(aidlData); // 调用 AIDL 接口
+                    Log.d("BroadcastService", "通过 AIDL 推送血糖数据: " + bgValue);
+                } catch (RemoteException e) {
+                    Log.e("BroadcastService", "通过 AIDL 推送数据失败", e);
+                    // 可能需要重连 AAPS 服务
+                }
+            } else {
+                Log.w("BroadcastService", "AAPS 服务未连接，无法通过 AIDL 发送数据");
+                // 可以尝试重连或等待连接
+            }
+            // --- AIDL 逻辑结束 ---
+            
         }
         return bundle;
     }
