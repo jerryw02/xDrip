@@ -1,7 +1,13 @@
 package com.eveningoutpost.dexdrip.services.broadcastservice;
 
+import com.eveningoutpost.dexdrip.services.broadcastservice.BgDataSender;
 import com.eveningoutpost.dexdrip.IBgDataService; // 替换为你的 AIDL 接口的实际包名
 import android.content.ServiceConnection;
+
+import android.content.ComponentName;
+import android.os.RemoteException;
+import android.util.Log;
+import com.eveningoutpost.dexdrip.BgData; // 替换为你的实际包名
 
 import android.app.Service;
 import android.content.BroadcastReceiver;
