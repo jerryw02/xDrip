@@ -4,6 +4,9 @@ import com.eveningoutpost.dexdrip.IBgDataService; // 替换为你的 AIDL 接口
 import com.eveningoutpost.dexdrip.IBgDataCallback; // 添加这行
 import com.eveningoutpost.dexdrip.BgData; // 替换为你的实际包名
 
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 import android.content.ServiceConnection;
 
 import android.content.ComponentName;
@@ -227,47 +230,51 @@ public class BroadcastService extends Service {
         }
     };
 
+    /**
+     * 客户端调用 bindService 时，系统会回调此方法
+     * 返回值是一个 IBinder 对象，客户端将用它来获取服务端的代理
+     */
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        String action = intent.getAction();
+        Log.d(TAG, "收到绑定请求: " + action + ". 返回 Binder 实例。");
+
+        // 返回我们在上面定义的 Stub 实例
+        return mBinder;
     }
 
-    private IBgDataCallback mAapsCallback = new IBgDataCallback.Stub() {
-        @Override
-        public void onBgDataReceived(BgData data) throws RemoteException {
-            // 在这里处理从 AAPS 接收到的数据
-            Log.d("BroadcastService", "从 AAPS 接收到血糖数据: " + data.value + " at " + data.timestamp);
-            // 你可以在这里添加处理逻辑，例如更新 UI 或触发其他操作
-        }
-        // IBgDataCallback.aidl 中没有其他方法，所以这里不需要实现别的
-    };
+    /**
+     * 当所有客户端都解绑时，系统调用此方法
+     * 如果返回 true，下次有客户端绑定时会再次调用 onBind
+     */
+    @Override
+    public boolean onUnbind(Intent intent) {
+        Log.d(TAG, "所有客户端已解绑");
+        return super.onUnbind(intent);
+        // 如果你希望服务在没有客户端时自动停止，可以在这里 stopSelf()
+    }
     
-    // 在 BroadcastService 类中添加
-    private IBgDataService mAapsService;
-    private ServiceConnection mAapsConnection = new ServiceConnection() {
+    // 1. 声明服务端 Stub 实例
+    private final IBgDataService.Stub mBinder = new IBgDataService.Stub() {
         @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            Log.d("BroadcastService", "成功连接到 AAPS 服务");
-            mAapsService = IBgDataService.Stub.asInterface(service);
-            try {
-                mAapsService.registerCallback(mAapsCallback); // 如果需要反向回调，可以实现
-            } catch (RemoteException e) {
-                Log.e("BroadcastService", "注册 AAPS 回调失败", e);
+        public void registerCallback(IBgDataCallback callback) throws RemoteException {
+            if (callback != null && !mCallbackList.contains(callback)) {
+                mCallbackList.add(callback);
+                Log.d(TAG, "AAPS 客户端注册成功。当前客户端数量: " + mCallbackList.size());
             }
         }
 
         @Override
-        public void onServiceDisconnected(ComponentName name) {
-            Log.e("BroadcastService", "AAPS 服务断开连接");
-            mAapsService = null;
+        public void unregisterCallback(IBgDataCallback callback) throws RemoteException {
+            mCallbackList.remove(callback);
+            Log.d(TAG, "AAPS 客户端注销。剩余客户端数量: " + mCallbackList.size());
         }
     };
 
-    private void bindToAapsService() {
-        Intent intent = new Intent();
-        intent.setClassName("com.your.aaps.package", "com.your.aaps.package.BgReceiverService"); // AAPS 的包名和服务名
-        bindService(intent, mAapsConnection, Context.BIND_AUTO_CREATE);
-    }
+    // 2. 使用线程安全的列表存储回调，防止并发修改异常
+    private final List<IBgDataCallback> mCallbackList = new CopyOnWriteArrayList<>();
+
+    
     
     /**
      * When service started it's will send a broadcast message CMD_START for thirdparty
@@ -283,7 +290,7 @@ public class BroadcastService extends Service {
         JoH.startService(BroadcastService.class, Const.INTENT_FUNCTION_KEY, Const.CMD_START);
 
         super.onCreate();
-        bindToAapsService(); // 调用绑定方法
+       
     }
 
     @Override
@@ -291,17 +298,7 @@ public class BroadcastService extends Service {
         UserError.Log.e(TAG, "killing service");
         broadcastEntities.clear();
         unregisterReceiver(broadcastReceiver);
-        super.onDestroy();
-
-        if (mAapsService != null) {
-            try {
-                mAapsService.unregisterCallback(mAapsCallback); // 注销回调
-            } catch (RemoteException e) {
-                Log.e("BroadcastService", "注销 AAPS 回调失败", e);
-            }
-            unbindService(mAapsConnection);
-        }
-        
+        super.onDestroy();       
     }
 
     @Override
@@ -620,28 +617,45 @@ public class BroadcastService extends Service {
             bundle.putLong("external.timeStamp", getLastStatusLineTime());
 
             // --- 新增：通过 AIDL 发送给 AAPS ---
-            // 确保 mAapsService 是在 Service 类中定义的全局变量，并在适当时候绑定
-            if (mAapsService != null) { 
-                try {
-                    // 创建 AIDL 需要的 BgData 对象
-                    // 注意：你需要根据 bundle 中实际使用的单位来决定是否需要转换
-                    // 这里假设 bundle.putDouble("bg_value", bgValue) 已经在上面的代码中执行
-                    // 或者直接使用从 dg/bgReading 获取的原始值
-                    BgData aidlData = new BgData(
-                        bgValue,          // 血糖值
-                        deltaName,        // 趋势 (如 "UP", "DOWN")
-                        timeStamp,        // 时间戳
-                        plugin.isEmpty() ? "xDrip" : plugin // 来源
-                    );
-                    mAapsService.updateBgData(aidlData); // 调用 AIDL 接口
-                    Log.d("BroadcastService", "通过 AIDL 推送血糖数据: " + bgValue);
-                } catch (RemoteException e) {
-                    Log.e("BroadcastService", "通过 AIDL 推送数据失败", e);
-                    // 可能需要重连 AAPS 服务
+            /**
+             * 这是 xDrip 内部处理完数据后，准备对外分发的地方
+             * 通常在处理完 Bundle 之后调用
+             */
+            private void sendDataToSubscribers(Intent intent) {
+    
+                // 1. 先处理 AIDL 推送 (极致及时性)
+                // 从 Intent 或者类成员变量中提取出 BgData 对象
+                BgData bgData = extractBgDataFromIntent(intent); // 你需要实现这个方法，或者直接用你现有的数据对象
+    
+                if (bgData != null) {
+                    pushBgData(bgData);
+                }        
+
+                // 2. 后处理传统广播 (可选，为了兼容其他未使用 AIDL 的 App)
+                // 如果你确定 AAPS 完全通过 AIDL 接收，这里可以不发广播，或者只发给其他插件
+                //sendBroadcast(intent); 
+            }
+
+            /**
+             * 核心推送方法
+             * 遍历所有已注册的客户端，调用其回调方法
+             */
+            private void pushBgData(BgData bgData) {
+                // 使用 CopyOnWriteArrayList 可以安全地在遍历时处理异常
+                for (IBgDataCallback callback : mCallbackList) {
+                    try {
+                        // oneway 特性会在这里体现为非阻塞调用
+                        // 即使客户端处理慢，也不会卡住 xDrip 的主线程
+                        callback.onNewBgData(bgData);
+                    } catch (RemoteException e) {
+                        // 如果抛出 RemoteException，说明客户端进程已死或连接中断
+                        Log.w(TAG, "推送失败，移除失效的客户端回调", e);
+                        mCallbackList.remove(callback);
+                    } catch (Exception e) {
+                        // 捕获其他意外异常
+                        Log.e(TAG, "推送发生未知错误", e);
+                    }
                 }
-            } else {
-                Log.w("BroadcastService", "AAPS 服务未连接，无法通过 AIDL 发送数据");
-                // 可以尝试重连或等待连接
             }
             // --- AIDL 逻辑结束 ---
             
