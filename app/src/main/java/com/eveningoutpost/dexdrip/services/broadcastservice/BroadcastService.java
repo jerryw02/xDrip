@@ -259,16 +259,10 @@ public class BroadcastService extends Service {
      * 这是 xDrip 内部处理完数据后，准备对外分发的地方
      * 通常在处理完 Bundle 之后调用
      */
-    private void sendDataToSubscribers(Intent intent) {
-    
-        // 1. 先处理 AIDL 推送 (极致及时性)
-        // 从 Intent 或者类成员变量中提取出 BgData 对象
-        BgData bgData = extractBgDataFromIntent(intent); // 你需要实现这个方法，或者直接用你现有的数据对象
-    
+    private void sendDataToSubscribers(BgData bgData) {  
         if (bgData != null) {
             pushBgData(bgData);
-        }        
-      
+        }
     }
 
     /**
@@ -296,13 +290,17 @@ public class BroadcastService extends Service {
     private BgData createBgDataFromBundle(Bundle bundle) {
         if (bundle == null) return null;
 
-        BgData data = new BgData();
-        data.setValue(bundle.getDouble("bg.valueMgdl"));
-        data.setTimestamp(bundle.getLong("bg.timeStamp"));
-        data.setIsStale(bundle.getBoolean("bg.isStale"));
-        data.setDeltaValue(bundle.getDouble("bg.deltaValueMgdl"));
-        // ... 设置其他字段 ...
-        return data;
+        double value = bundle.getDouble("bg.valueMgdl", 0);
+        String deltaName = bundle.getString("bg.deltaName", "");
+        long timestamp = bundle.getLong("bg.timeStamp", 0);
+        String plugin = bundle.getString("bg.plugin", "");
+        // 如果还有其他必填字段，从 bundle 中提取
+
+        try {
+            return new BgData(value, deltaName, timestamp, plugin);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to create BgData from bundle", e);
+            return null;
     }
 
     private void actuallySendData(BroadcastModel model) {
@@ -329,6 +327,13 @@ public class BroadcastService extends Service {
         public void unregisterCallback(IBgDataCallback callback) throws RemoteException {
             mCallbackList.remove(callback);
             Log.d(TAG, "AAPS 客户端注销。剩余客户端数量: " + mCallbackList.size());
+        }
+
+        @Override
+        public void updateBgData(BgData data) throws RemoteException {
+            // 如果 AAPS 主动推送数据给 xDrip（通常不需要），可在这里处理
+            // 否则留空或抛异常
+            Log.w(TAG, "updateBgData called but not implemented");
         }
     };
 
