@@ -254,6 +254,74 @@ public class BroadcastService extends Service {
         // 如果你希望服务在没有客户端时自动停止，可以在这里 stopSelf()
     }
     
+    // --- 新增：通过 AIDL 发送给 AAPS ---
+    /**
+     * 这是 xDrip 内部处理完数据后，准备对外分发的地方
+     * 通常在处理完 Bundle 之后调用
+     */
+    private void sendDataToSubscribers(Intent intent) {
+    
+        // 1. 先处理 AIDL 推送 (极致及时性)
+        // 从 Intent 或者类成员变量中提取出 BgData 对象
+        BgData bgData = extractBgDataFromIntent(intent); // 你需要实现这个方法，或者直接用你现有的数据对象
+    
+        if (bgData != null) {
+            pushBgData(bgData);
+        }        
+
+        // 2. 后处理传统广播 (可选，为了兼容其他未使用 AIDL 的 App)
+        // 如果你确定 AAPS 完全通过 AIDL 接收，这里可以不发广播，或者只发给其他插件
+        //sendBroadcast(intent); 
+    }
+
+    /**
+     * 核心推送方法
+     * 遍历所有已注册的客户端，调用其回调方法
+     */
+    private void pushBgData(BgData bgData) {
+        // 使用 CopyOnWriteArrayList 可以安全地在遍历时处理异常
+        for (IBgDataCallback callback : mCallbackList) {
+            try {
+                // oneway 特性会在这里体现为非阻塞调用
+                // 即使客户端处理慢，也不会卡住 xDrip 的主线程
+                callback.onNewBgData(bgData);
+            } catch (RemoteException e) {
+                // 如果抛出 RemoteException，说明客户端进程已死或连接中断
+                Log.w(TAG, "推送失败，移除失效的客户端回调", e);
+                mCallbackList.remove(callback);
+            } catch (Exception e) {
+                // 捕获其他意外异常
+                Log.e(TAG, "推送发生未知错误", e);
+            }
+        }
+    }
+
+    private BgData createBgDataFromBundle(Bundle bundle) {
+        if (bundle == null) return null;
+
+        BgData data = new BgData();
+        data.setValue(bundle.getDouble("bg.valueMgdl"));
+        data.setTimestamp(bundle.getLong("bg.timeStamp"));
+        data.setIsStale(bundle.getBoolean("bg.isStale"));
+        data.setDeltaValue(bundle.getDouble("bg.deltaValueMgdl"));
+        // ... 设置其他字段 ...
+        return data;
+    }
+
+    private void actuallySendData(BroadcastModel model) {
+        Bundle bundle = prepareBgBundle(model);
+        BgData bgData = createBgDataFromBundle(bundle);
+        sendDataToSubscribers(bgData);
+        
+        // 如果还需要兼容旧广播，可以在这里发
+        // Intent intent = new Intent("custom.action");
+        // intent.putExtra("data", bundle);
+        // sendBroadcast(intent);
+    }
+    
+    // --- AIDL 逻辑结束 ---    
+
+    
     // 1. 声明服务端 Stub 实例
     private final IBgDataService.Stub mBinder = new IBgDataService.Stub() {
         @Override
@@ -620,43 +688,7 @@ public class BroadcastService extends Service {
             /**
              * 这是 xDrip 内部处理完数据后，准备对外分发的地方
              * 通常在处理完 Bundle 之后调用
-             */
-            private void sendDataToSubscribers(Intent intent) {
-    
-                // 1. 先处理 AIDL 推送 (极致及时性)
-                // 从 Intent 或者类成员变量中提取出 BgData 对象
-                BgData bgData = extractBgDataFromIntent(intent); // 你需要实现这个方法，或者直接用你现有的数据对象
-    
-                if (bgData != null) {
-                    pushBgData(bgData);
-                }        
-
-                // 2. 后处理传统广播 (可选，为了兼容其他未使用 AIDL 的 App)
-                // 如果你确定 AAPS 完全通过 AIDL 接收，这里可以不发广播，或者只发给其他插件
-                //sendBroadcast(intent); 
-            }
-
-            /**
-             * 核心推送方法
-             * 遍历所有已注册的客户端，调用其回调方法
-             */
-            private void pushBgData(BgData bgData) {
-                // 使用 CopyOnWriteArrayList 可以安全地在遍历时处理异常
-                for (IBgDataCallback callback : mCallbackList) {
-                    try {
-                        // oneway 特性会在这里体现为非阻塞调用
-                        // 即使客户端处理慢，也不会卡住 xDrip 的主线程
-                        callback.onNewBgData(bgData);
-                    } catch (RemoteException e) {
-                        // 如果抛出 RemoteException，说明客户端进程已死或连接中断
-                        Log.w(TAG, "推送失败，移除失效的客户端回调", e);
-                        mCallbackList.remove(callback);
-                    } catch (Exception e) {
-                        // 捕获其他意外异常
-                        Log.e(TAG, "推送发生未知错误", e);
-                    }
-                }
-            }
+             */            
             // --- AIDL 逻辑结束 ---
             
         }
