@@ -268,10 +268,7 @@ public class BroadcastService extends Service {
         if (bgData != null) {
             pushBgData(bgData);
         }        
-
-        // 2. 后处理传统广播 (可选，为了兼容其他未使用 AIDL 的 App)
-        // 如果你确定 AAPS 完全通过 AIDL 接收，这里可以不发广播，或者只发给其他插件
-        //sendBroadcast(intent); 
+      
     }
 
     /**
@@ -311,12 +308,8 @@ public class BroadcastService extends Service {
     private void actuallySendData(BroadcastModel model) {
         Bundle bundle = prepareBgBundle(model);
         BgData bgData = createBgDataFromBundle(bundle);
-        sendDataToSubscribers(bgData);
-        
-        // 如果还需要兼容旧广播，可以在这里发
-        // Intent intent = new Intent("custom.action");
-        // intent.putExtra("data", bundle);
-        // sendBroadcast(intent);
+        sendDataToSubscribers(bgData);   
+  
     }
     
     // --- AIDL 逻辑结束 ---    
@@ -416,6 +409,9 @@ public class BroadcastService extends Service {
                 case Const.CMD_UPDATE_BG:
                     handled = true;
                     bundle = prepareBgBundle(broadcastModel);
+                
+                    actuallySendData(broadcastModel); // ← 推送 AIDL
+                    
                     sendBroadcast(function, receiver, bundle);
                     break;
                 case Const.CMD_ALERT:
@@ -451,6 +447,9 @@ public class BroadcastService extends Service {
             case Const.CMD_UPDATE_BG_FORCE:
                 broadcastModel = broadcastEntities.get(receiver);
                 bundle = prepareBgBundle(broadcastModel);
+
+                actuallySendData(broadcastModel); // ← 推送 AIDL
+                
                 break;
             case Const.CMD_CANCEL_ALERT:
                 receiver = null; //broadcast
