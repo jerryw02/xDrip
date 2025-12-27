@@ -20,7 +20,7 @@ public class BgDataService extends Service {
             final int N = mCallbacks.beginBroadcast();
             for (int i = 0; i < N; i++) {
                 try {
-                    mCallbacks.getBroadcastItem(i).onBgDataReceived(data);
+                    mCallbacks.getBroadcastItem(i).onNewBgData(data);
                 } catch (RemoteException e) {
                     // 客户端死亡，从列表中移除
                     Log.e(TAG, "回调失败，客户端可能已死亡", e);
