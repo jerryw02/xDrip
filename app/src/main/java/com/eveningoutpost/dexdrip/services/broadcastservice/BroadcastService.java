@@ -301,6 +301,8 @@ public class BroadcastService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "Failed to create BgData from bundle", e);
             return null;
+        }
+        
     }
 
     private void actuallySendData(BroadcastModel model) {
