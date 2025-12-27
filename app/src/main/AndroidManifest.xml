@@ -894,12 +894,16 @@
         <service android:name=".cgm.webfollow.WebFollowService" />
 
         <service
-            android:name=".BgDataService"
-            android:enabled="true"
-            android:exported="true"> <!-- exported=true 允许其他 App 绑定 -->
+            android:name=".services.BroadcastService"
+            android:exported="true" <!-- 必须为 true，否则 AAPS (外部 App) 无法绑定 -->
+            android:process=":remote"> <!-- 建议独立进程，防止主界面卡顿影响数据传输 -->
+    
+            <!-- 这个 Intent-filter 是 AAPS bindService 时需要的 Action -->
             <intent-filter>
-                <action android:name="com.eveningoutpost.dexdrip.BIND_BG_SERVICE" /> <!-- 定义一个 Action -->
+                <action android:name="com.eveningoutpost.dexdrip.BIND_BG_SERVICE" />
+                <!-- 如果有指定包名，也可以加上 category -->
             </intent-filter>
+    
         </service>
         
     </application>
