@@ -422,6 +422,8 @@ public class BroadcastService extends Service {
                     actuallySendData(broadcastModel); // ← 推送 AIDL
                                     
                     sendBroadcast(function, receiver, bundle);
+                    UserError.Log.d(TAG, "test");
+                    
                     break;
                 case Const.CMD_ALERT:
                     handled = true;
