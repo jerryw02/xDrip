@@ -1,6 +1,6 @@
 package com.eveningoutpost.dexdrip; // 请替换为 xDrip 的实际包名
 
-import com.eveningoutpost.dexdrip.utilitymodels.UserError;
+import com.eveningoutpost.dexdrip.models.UserError;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
