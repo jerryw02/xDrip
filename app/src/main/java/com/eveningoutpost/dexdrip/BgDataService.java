@@ -1,5 +1,6 @@
 package com.eveningoutpost.dexdrip; // 请替换为 xDrip 的实际包名
 
+import com.eveningoutpost.dexdrip.utilitymodels.UserError;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
@@ -15,7 +16,7 @@ public class BgDataService extends Service {
     private final IBgDataService.Stub mBinder = new IBgDataService.Stub() {
         @Override
         public void updateBgData(BgData data) throws RemoteException {
-            Log.d(TAG, "收到 updateBgData 请求，推送数据到 AAPS: " + data.value);
+            UserError.Log.d(TAG, "收到 updateBgData 请求，推送数据到 AAPS: " + data.value);
             // 遍历所有已注册的回调，通知它们数据更新了
             final int N = mCallbacks.beginBroadcast();
             for (int i = 0; i < N; i++) {
@@ -23,7 +24,7 @@ public class BgDataService extends Service {
                     mCallbacks.getBroadcastItem(i).onNewBgData(data);
                 } catch (RemoteException e) {
                     // 客户端死亡，从列表中移除
-                    Log.e(TAG, "回调失败，客户端可能已死亡", e);
+                    UserError.Log.e(TAG, "回调失败，客户端可能已死亡", e);
                 }
             }
             mCallbacks.finishBroadcast();
@@ -31,7 +32,7 @@ public class BgDataService extends Service {
 
         @Override
         public void registerCallback(IBgDataCallback callback) throws RemoteException {
-            Log.d(TAG, "AAPS 注册回调");
+            UserError.Log.d(TAG, "AAPS 注册回调");
             if (callback != null) {
                 mCallbacks.register(callback);
             }
@@ -39,7 +40,7 @@ public class BgDataService extends Service {
 
         @Override
         public void unregisterCallback(IBgDataCallback callback) throws RemoteException {
-            Log.d(TAG, "AAPS 注销回调");
+            UserError.Log.d(TAG, "AAPS 注销回调");
             if (callback != null) {
                 mCallbacks.unregister(callback);
             }
@@ -51,7 +52,7 @@ public class BgDataService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        Log.d(TAG, "AAPS 绑定 xDrip 服务");
+        UserError.Log.d(TAG, "AAPS 绑定 xDrip 服务");
         return mBinder;
     }
 
