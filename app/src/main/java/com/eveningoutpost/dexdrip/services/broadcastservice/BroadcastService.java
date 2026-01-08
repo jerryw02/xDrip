@@ -276,6 +276,8 @@ public class BroadcastService extends Service {
                 // oneway 特性会在这里体现为非阻塞调用
                 // 即使客户端处理慢，也不会卡住 xDrip 的主线程
                 callback.onNewBgData(bgData);
+                UserError.Log.d(TAG, "推送NewBgData");
+                
             } catch (RemoteException e) {
                 // 如果抛出 RemoteException，说明客户端进程已死或连接中断
                 UserError.Log.w(TAG, "推送失败，移除失效的客户端回调", e);
