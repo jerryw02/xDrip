@@ -237,7 +237,7 @@ public class BroadcastService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         String action = intent.getAction();
-        Log.d(TAG, "收到绑定请求: " + action + ". 返回 Binder 实例。");
+        UserError.Log.d(TAG, "收到绑定请求: " + action + ". 返回 Binder 实例。");
 
         // 返回我们在上面定义的 Stub 实例
         return mBinder;
@@ -249,7 +249,7 @@ public class BroadcastService extends Service {
      */
     @Override
     public boolean onUnbind(Intent intent) {
-        Log.d(TAG, "所有客户端已解绑");
+        UserError.Log.d(TAG, "所有客户端已解绑");
         return super.onUnbind(intent);
         // 如果你希望服务在没有客户端时自动停止，可以在这里 stopSelf()
     }
@@ -278,11 +278,11 @@ public class BroadcastService extends Service {
                 callback.onNewBgData(bgData);
             } catch (RemoteException e) {
                 // 如果抛出 RemoteException，说明客户端进程已死或连接中断
-                Log.w(TAG, "推送失败，移除失效的客户端回调", e);
+                UserError.Log.w(TAG, "推送失败，移除失效的客户端回调", e);
                 mCallbackList.remove(callback);
             } catch (Exception e) {
                 // 捕获其他意外异常
-                Log.e(TAG, "推送发生未知错误", e);
+                UserError.Log.e(TAG, "推送发生未知错误", e);
             }
         }
     }
@@ -299,7 +299,7 @@ public class BroadcastService extends Service {
         try {
             return new BgData(value, deltaName, timestamp, plugin);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to create BgData from bundle", e);
+            UserError.Log.e(TAG, "Failed to create BgData from bundle", e);
             return null;
         }
         
@@ -321,21 +321,21 @@ public class BroadcastService extends Service {
         public void registerCallback(IBgDataCallback callback) throws RemoteException {
             if (callback != null && !mCallbackList.contains(callback)) {
                 mCallbackList.add(callback);
-                Log.d(TAG, "AAPS 客户端注册成功。当前客户端数量: " + mCallbackList.size());
+                UserError.Log.d(TAG, "AAPS 客户端注册成功。当前客户端数量: " + mCallbackList.size());
             }
         }
 
         @Override
         public void unregisterCallback(IBgDataCallback callback) throws RemoteException {
             mCallbackList.remove(callback);
-            Log.d(TAG, "AAPS 客户端注销。剩余客户端数量: " + mCallbackList.size());
+            UserError.Log.d(TAG, "AAPS 客户端注销。剩余客户端数量: " + mCallbackList.size());
         }
 
         @Override
         public void updateBgData(BgData data) throws RemoteException {
             // 如果 AAPS 主动推送数据给 xDrip（通常不需要），可在这里处理
             // 否则留空或抛异常
-            Log.w(TAG, "updateBgData called but not implemented");
+            UserError.Log.w(TAG, "updateBgData called but not implemented");
         }
     };
 
@@ -418,7 +418,7 @@ public class BroadcastService extends Service {
                     bundle = prepareBgBundle(broadcastModel);
                 
                     actuallySendData(broadcastModel); // ← 推送 AIDL
-                    
+                                    
                     sendBroadcast(function, receiver, bundle);
                     break;
                 case Const.CMD_ALERT:
