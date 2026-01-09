@@ -423,6 +423,7 @@ public class BroadcastService extends Service {
                                     
                     sendBroadcast(function, receiver, bundle);
                     UserError.Log.d(TAG, "test");
+                    UserError.Log.e(TAG, "testtest");
                     
                     break;
                 case Const.CMD_ALERT:
