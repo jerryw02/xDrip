@@ -516,6 +516,7 @@ public class BroadcastService extends Service {
                 return;
         }
         sendBroadcast(function, receiver, bundle);
+        UserError.Log.e(TAG, "testtesttest");
     }
 
     /**
