@@ -90,7 +90,7 @@
 
     <application
         android:name=".xdrip"
-        android:allowBackup="false"
+        android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:largeHeap="true"
@@ -902,7 +902,7 @@
             android:name=".BgDataService"
             android:exported="true"
             android:enabled="true"
-            android:process=":remote">
+            android:foregroundServiceType="health">
 
             <intent-filter>
                 <action android:name="com.eveningoutpost.dexdrip.BgDataService" />
