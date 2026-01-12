@@ -1,4 +1,2 @@
-// BgData.aidl
-package com.eveningoutpost.dexdrip; // 请替换为 xDrip 的实际包名
-
+package com.eveningoutpost.dexdrip;
 parcelable BgData;
