@@ -895,15 +895,17 @@
 
         <!-- 
             xDrip AIDL 服务：供 AAPS 绑定以获取实时血糖数据
-            必须 exported="true"，且需定义 intent-filter
+            必须 exported="true"，允许其他应用绑定
+            且需定义 intent-filter
         -->
         <service
-            android:name=".services.BroadcastService"
+            android:name=".BgDataService"
             android:exported="true"
+            android:enabled="true"
             android:process=":remote">
 
             <intent-filter>
-                <action android:name="com.eveningoutpost.dexdrip.BIND_BG_SERVICE" />
+                <action android:name="com.eveningoutpost.dexdrip.BgDataService" />
             </intent-filter>
 
         </service>
