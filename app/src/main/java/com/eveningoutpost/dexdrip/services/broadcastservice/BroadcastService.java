@@ -421,11 +421,7 @@ public class BroadcastService extends Service {
                 
                     actuallySendData(broadcastModel); // ← 推送 AIDL
                                     
-                    sendBroadcast(function, receiver, bundle);
-                    UserError.Log.d(TAG, "test");
-                    UserError.Log.e(TAG, "testtest");
-                    UserError.Log.uel(TAG, "testtesttesttest");
-                    
+                    sendBroadcast(function, receiver, bundle);                    
                     break;
                 case Const.CMD_ALERT:
                     handled = true;
@@ -516,8 +512,7 @@ public class BroadcastService extends Service {
             default:
                 return;
         }
-        sendBroadcast(function, receiver, bundle);
-        UserError.Log.e(TAG, "testtesttest");
+        sendBroadcast(function, receiver, bundle);       
     }
 
     /**
@@ -529,9 +524,7 @@ public class BroadcastService extends Service {
     protected void sendBroadcast(String function, String receiver, Bundle bundle) {
         Intent intent = new Intent(ACTION_WATCH_COMMUNICATION_SENDER);
         UserError.Log.d(TAG, String.format("sendBroadcast functionName: %s, receiver: %s", function, receiver));
-        //test
-        UserError.Log.uel(TAG, String.format("sendBroadcast functionName: %s, receiver: %s", function, receiver));
-
+       
         if (function == null || function.isEmpty()) {
             UserError.Log.d(TAG, "Error, function not specified");
             return;
