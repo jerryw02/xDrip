@@ -749,6 +749,61 @@ public class BroadcastService extends Service {
      * @param bundle If specified, would be added to broadcast {@link Intent}
      */
     protected void sendBroadcast(String function, String receiver, Bundle bundle) {
+
+        ////////////////////////////
+
+        // 🚨🚨🚨 立即添加AIDL测试 🚨🚨🚨
+    try {
+        logToEventLog("🚨 sendBroadcast被调用 - function: " + function + ", receiver: " + receiver);
+        
+        // 只针对血糖相关的广播进行测试
+        if ("BG_READING".equals(function) || 
+            function != null && function.contains("GLUCOSE") ||
+            function != null && function.contains("BG")) {
+            
+            logToEventLog("🚨 检测到血糖广播，开始AIDL测试");
+            
+            // 立即测试AIDL
+            try {
+                BgData testData = new BgData();
+                testData.timestamp = System.currentTimeMillis();
+                
+                // 从bundle中获取血糖值，如果没有就用测试值
+                if (bundle != null && bundle.containsKey("glucose")) {
+                    testData.value = bundle.getFloat("glucose");
+                } else {
+                    testData.value = 99.9f; // 默认测试值
+                }
+                
+                testData.trend = "↗️";
+                testData.noise = 0;
+                
+                logToEventLog("🚨 准备调用AIDL，血糖值: " + testData.value);
+                
+                BgDataServiceManager.getInstance().onNewBgData(testData);
+                logToEventLog("🚨 ✅✅✅ AIDL调用成功！");
+                
+            } catch (Exception e) {
+                logToEventLog("🚨 ❌❌❌ AIDL调用失败: " + e.getClass().getSimpleName());
+                logToEventLog("🚨 错误详情: " + e.getMessage());
+                
+                // 打印堆栈
+                StringWriter sw = new StringWriter();
+                e.printStackTrace(new PrintWriter(sw));
+                String stackTrace = sw.toString();
+                String[] lines = stackTrace.split("\n");
+                for (int i = 0; i < Math.min(lines.length, 3); i++) {
+                    logToEventLog("🚨 堆栈" + i + ": " + lines[i].trim());
+                }
+            }
+        }
+    } catch (Exception e) {
+        android.util.Log.e("AIDL", "日志记录失败: " + e.getMessage());
+    }
+
+        //////////////////////////// 
+        
+        
         Intent intent = new Intent(ACTION_WATCH_COMMUNICATION_SENDER);
         UserError.Log.d(TAG, String.format("sendBroadcast functionName: %s, receiver: %s", function, receiver));
        
