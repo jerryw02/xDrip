@@ -272,7 +272,7 @@ public class BroadcastService extends Service {
     private void actuallySendData(BroadcastModel broadcastModel) {
         if (aidlLogger != null) {
             aidlLogger.step("AIDL发送", "开始", 
-                "model:" + (broadcastModel != null ? broadcastModel.getAppName() : "null"));
+                "model:" + (broadcastModel != null ? broadcastModel.toString() : "null"));
         }
         
         if (broadcastModel == null) {
