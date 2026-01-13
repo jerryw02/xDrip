@@ -99,48 +99,111 @@ public class BgDataService extends Service {
     
     @Override
 public IBinder onBind(Intent intent) {
-    logger.step("服务绑定", "开始");
+    logger.step("服务绑定", "开始 - 智能判断");
     
     if (intent == null) {
         logger.warn("绑定请求intent为null，返回AIDL binder");
+        logger.debug("返回AIDL Binder类名: " + binder.getClass().getName());
         return binder;
     }
     
     String action = intent.getAction();
     String packageName = intent.getPackage();
-    String component = intent.getComponent() != null ? 
-                       intent.getComponent().getClassName() : "null";
+    ComponentName component = intent.getComponent();
     
-    logger.debug("绑定请求详情:");
-    logger.debug("  Action: " + action);
-    logger.debug("  Package: " + packageName);
-    logger.debug("  Component: " + component);
-    logger.debug("  Extras: " + (intent.getExtras() != null ? 
+    logger.debug("=== 绑定请求详细分析 ===");
+    logger.debug("Action: " + action);
+    logger.debug("Package: " + packageName);
+    logger.debug("Component: " + (component != null ? component.getClassName() : "null"));
+    logger.debug("Extras: " + (intent.getExtras() != null ? 
                intent.getExtras().toString() : "none"));
     
-    // 检查是否是AAPS客户端
-    boolean isAAPS = false;
-    boolean isInternal = false;
+    // 获取当前应用的包名
+    String currentPackageName = getPackageName();
+    logger.debug("当前应用包名: " + currentPackageName);
     
-    if (packageName != null) {
-        isAAPS = packageName.contains("androidaps") || 
-                 packageName.contains("aaps") ||
-                 packageName.equals("com.eveningoutpost.dexdrip");
-        isInternal = packageName.equals(getPackageName());
-        
-        logger.debug("包名分析:");
-        logger.debug("  是否AAPS: " + isAAPS);
-        logger.debug("  是否内部: " + isInternal);
+    // 判断是否是内部调用（来自xdrip应用自身）
+    boolean isInternalCall = false;
+    
+    // 方法1：通过包名判断
+    if (packageName != null && packageName.equals(currentPackageName)) {
+        isInternalCall = true;
+        logger.debug("✅ 通过包名判断为内部调用");
     }
     
-    // 关键修复：给外部应用（包括AAPS）返回AIDL binder
-    if (isInternal && action != null && "local".equals(action)) {
-        logger.success("内部绑定，返回LocalBinder");
+    // 方法2：通过Component判断（如果没有设置包名）
+    if (!isInternalCall && component != null) {
+        String componentPackage = component.getPackageName();
+        if (componentPackage != null && componentPackage.equals(currentPackageName)) {
+            isInternalCall = true;
+            logger.debug("✅ 通过Component包名判断为内部调用");
+        }
+    }
+    
+    // 方法3：通过Action判断（显式标记）
+    if (action != null) {
+        if ("local".equals(action) || "internal".equals(action) || "xdrip.internal".equals(action)) {
+            isInternalCall = true;
+            logger.debug("✅ 通过Action判断为内部调用: " + action);
+        } else if ("aidl".equals(action) || "external".equals(action) || "aaps".equals(action)) {
+            isInternalCall = false;
+            logger.debug("✅ 通过Action判断为外部调用: " + action);
+        }
+    }
+    
+    // 方法4：通过调用栈判断（最准确）
+    if (!isInternalCall) {
+        try {
+            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+            logger.debug("调用栈分析（前10个）:");
+            for (int i = 3; i < Math.min(stackTrace.length, 13); i++) {
+                StackTraceElement element = stackTrace[i];
+                String className = element.getClassName();
+                String methodName = element.getMethodName();
+                
+                // 记录调用栈信息
+                logger.debug("  [" + i + "] " + className + "." + methodName + "()");
+                
+                // 检查是否是xdrip内部类在调用
+                if (className.contains("com.eveningoutpost.dexdrip") &&
+                    (className.contains("xdrip") || 
+                     className.contains("Xdrip") ||
+                     className.contains("BroadcastService"))) {
+                    isInternalCall = true;
+                    logger.debug("✅ 通过调用栈判断为内部调用: " + className);
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("调用栈分析失败: " + e.getMessage());
+        }
+    }
+    
+    // 方法5：通过Extra判断
+    if (intent.getExtras() != null) {
+        Bundle extras = intent.getExtras();
+        if (extras.containsKey("internal_call") || 
+            extras.containsKey("caller") && extras.getString("caller", "").contains("xdrip")) {
+            isInternalCall = true;
+            logger.debug("✅ 通过Extra判断为内部调用");
+        }
+    }
+    
+    // 最终决定返回哪种Binder
+    if (isInternalCall) {
+        logger.success("✅ 判断为内部调用，返回LocalBinder");
+        logger.debug("LocalBinder类名: " + localBinder.getClass().getName());
+        logger.debug("LocalBinder是否是AIDL Stub: " + (localBinder instanceof IBgDataService.Stub));
+        logger.debug("LocalBinder是否是Binder子类: " + (localBinder instanceof Binder));
+        
+        // 返回LocalBinder给xdrip内部调用
         return localBinder;
     } else {
-        // 默认返回AIDL binder给所有外部调用
-        logger.success("外部绑定，返回AIDL Binder");
-        logger.debug("Binder类型: " + binder.getClass().getName());
+        logger.success("✅ 判断为外部调用，返回AIDL Binder");
+        logger.debug("AIDL Binder类名: " + binder.getClass().getName());
+        logger.debug("AIDL Binder是否是IBgDataService.Stub: " + (binder instanceof IBgDataService.Stub));
+        
+        // 返回AIDL Binder给外部应用（如AAPS）
         return binder;
     }
 }
