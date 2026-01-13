@@ -60,6 +60,14 @@ public class xdrip extends Application {
     public static PlusAsyncExecutor executor;
     public static boolean useBF = false;
     private static Boolean isRunningTestCache;
+
+    // =============== AIDL 服务管理方法（新增） ===============
+    
+    private IBgDataService bgAidlService = null;
+    private ServiceConnection bgServiceConnection = null;
+    private BgDataService bgDataService = null;
+    private boolean isBgDataServiceBound = false;
+    private com.eveningoutpost.dexdrip.utils.AIDLLogger aidlLogger = null;
     
     // =============== AIDL 服务管理方法（新增） ===============
     
