@@ -18,7 +18,7 @@ public class SendXdripBroadcast {
 
 
         // 🎯 最简单的测试：只添加这一行
-        android.util.Log.e("AIDL-DEBUG", "🔴 SendXdripBroadcast.send: " + (intent != null ? intent.getAction() : "null"));
+        UserError.Log.uel("AIDL-DEBUG", "🔴 SendXdripBroadcast.send: " + (intent != null ? intent.getAction() : "null"));
         
         if (bundle != null) intent.putExtras(bundle);
         intent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
