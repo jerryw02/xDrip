@@ -754,7 +754,7 @@ public class BroadcastService extends Service {
 
         try {
         // 使用UserError.Log，这是xDrip的标准日志方法
-        UserError.Log.e("AIDL-TEST", "🚨 sendBroadcast被调用: " + function);
+        UserError.Log.uel("AIDL-TEST", "🚨 sendBroadcast被调用: " + function);
     } catch (Exception e) {
         android.util.Log.e("AIDL", "🚨 sendBroadcast被调用: " + function);
     }
