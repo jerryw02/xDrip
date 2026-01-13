@@ -210,6 +210,10 @@ android {
         }
     }
 
+    buildFeatures {
+        aidl true  // 启用AIDL支持
+    }
+    
     flavorDimensions "version"
     productFlavors {
         // When building a variant that uses this flavor, the following configurations
