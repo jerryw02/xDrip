@@ -259,10 +259,18 @@ public class xdrip extends Application {
             serviceIntent.putExtra("startup_priority", "high");
             serviceIntent.putExtra("started_by", "xdrip_application");
             
-            // 启动服务
-            Log.d(TAG, "启动BgDataService");
+            // ✅ 关键修改：明确标记为内部调用
+            serviceIntent.setAction("local"); // 或者 "internal"
+            serviceIntent.setPackage(getPackageName()); // 设置包名
+        
+            // 添加额外标记
+            serviceIntent.putExtra("internal_call", true);
+            serviceIntent.putExtra("caller", "xdrip_main_app");
+            
+             // 启动服务
+            Log.d(TAG, "启动BgDataService (标记为内部调用)");
             if (aidlLogger != null) {
-                aidlLogger.debug("启动BgDataService");
+                aidlLogger.debug("启动BgDataService (标记为内部调用)");
             }
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
