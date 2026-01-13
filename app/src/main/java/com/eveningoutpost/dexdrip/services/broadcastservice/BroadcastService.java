@@ -249,7 +249,8 @@ public class BroadcastService extends Service {
         UserError.Log.d(TAG, "收到绑定请求: " + action + ". 返回 Binder 实例。");
 
         // 返回我们在上面定义的 Stub 实例
-        return mBinder;
+        //return mBinder;
+        return null;
     }
 
     /**
@@ -259,7 +260,8 @@ public class BroadcastService extends Service {
     @Override
     public boolean onUnbind(Intent intent) {
         UserError.Log.d(TAG, "所有客户端已解绑");
-        return super.onUnbind(intent);
+        //return super.onUnbind(intent);
+        return false;
         // 如果你希望服务在没有客户端时自动停止，可以在这里 stopSelf()
     }
     
@@ -506,39 +508,39 @@ public class BroadcastService extends Service {
     
     // =============== AIDL 结束 ===============
     
-    // 1. 声明服务端 Stub 实例
-    private final IBgDataService.Stub mBinder = new IBgDataService.Stub() {
-        @Override
-        public void registerCallback(IBgDataCallback callback) throws RemoteException {
-            if (callback != null && !mCallbackList.contains(callback)) {
-                mCallbackList.add(callback);
-                UserError.Log.d(TAG, "AAPS 客户端注册成功。当前客户端数量: " + mCallbackList.size());
-            }
-        }
+    //// 1. 声明服务端 Stub 实例
+    //private final IBgDataService.Stub mBinder = new IBgDataService.Stub() {
+    //    @Override
+    //    public void registerCallback(IBgDataCallback callback) throws RemoteException {
+    //        if (callback != null && !mCallbackList.contains(callback)) {
+    //            mCallbackList.add(callback);
+    //            UserError.Log.d(TAG, "AAPS 客户端注册成功。当前客户端数量: " + mCallbackList.size());
+    //        }
+    //    }
 
-        @Override
-        public void unregisterCallback(IBgDataCallback callback) throws RemoteException {
-            mCallbackList.remove(callback);
-            UserError.Log.d(TAG, "AAPS 客户端注销。剩余客户端数量: " + mCallbackList.size());
-        }
+    //    @Override
+    //    public void unregisterCallback(IBgDataCallback callback) throws RemoteException {
+    //        mCallbackList.remove(callback);
+    //        UserError.Log.d(TAG, "AAPS 客户端注销。剩余客户端数量: " + mCallbackList.size());
+    //    }
 
-        @Override
-        public void updateBgData(BgData data) throws RemoteException {
-            // 如果 AAPS 主动推送数据给 xDrip（通常不需要），可在这里处理
-            // 否则留空或抛异常
-            UserError.Log.w(TAG, "updateBgData called but not implemented");
-        }
+    //    @Override
+    //    public void updateBgData(BgData data) throws RemoteException {
+    //        // 如果 AAPS 主动推送数据给 xDrip（通常不需要），可在这里处理
+    //        // 否则留空或抛异常
+    //        UserError.Log.w(TAG, "updateBgData called but not implemented");
+    //    }
         
-        @Override
-        public BgData getLatestBgData() throws RemoteException {
-            // 实现获取最新血糖数据
-            UserError.Log.d(TAG, "getLatestBgData called");
-            return null; // 需要实际实现
-        }
-    };
+    //    @Override
+    //    public BgData getLatestBgData() throws RemoteException {
+    //        // 实现获取最新血糖数据
+    //        UserError.Log.d(TAG, "getLatestBgData called");
+    //        return null; // 需要实际实现
+    //    }
+    //};
 
     // 2. 使用线程安全的列表存储回调，防止并发修改异常
-    private final List<IBgDataCallback> mCallbackList = new CopyOnWriteArrayList<>();
+    //private final List<IBgDataCallback> mCallbackList = new CopyOnWriteArrayList<>();
 
     
     
