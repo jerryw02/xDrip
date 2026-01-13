@@ -46,7 +46,7 @@ public class AIDLLogger {
      */
     public void info(String message) {
         String formatted = formatMessage("INFO", message);
-        UserError.Log.i(EVENT_LOG_TAG, formatted);
+        UserError.Log.uel(EVENT_LOG_TAG, formatted);
     }
     
     /**
@@ -54,7 +54,7 @@ public class AIDLLogger {
      */
     public void debug(String message) {
         String formatted = formatMessage("DEBUG", message);
-        UserError.Log.d(EVENT_LOG_TAG, formatted);
+        UserError.Log.uel(EVENT_LOG_TAG, formatted);
     }
     
     /**
@@ -62,7 +62,7 @@ public class AIDLLogger {
      */
     public void warn(String message) {
         String formatted = formatMessage("WARN", message);
-        UserError.Log.w(EVENT_LOG_TAG, formatted);
+        UserError.Log.uel(EVENT_LOG_TAG, formatted);
     }
     
     /**
@@ -70,7 +70,7 @@ public class AIDLLogger {
      */
     public void error(String message) {
         String formatted = formatMessage("ERROR", message);
-        UserError.Log.e(EVENT_LOG_TAG, formatted);
+        UserError.Log.uel(EVENT_LOG_TAG, formatted);
     }
     
     /**
