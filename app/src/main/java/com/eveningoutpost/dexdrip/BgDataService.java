@@ -98,20 +98,52 @@ public class BgDataService extends Service {
     }
     
     @Override
-    public IBinder onBind(Intent intent) {
-        String action = intent != null ? intent.getAction() : null;
-        logger.debug("客户端绑定请求，action: " + action);
-        
-        if (action != null && action.contains("local")) {
-            // 内部绑定
-            logger.debug("返回本地Binder给内部调用");
-            return localBinder;
-        }
-        
-        // 外部AIDL绑定
-        logger.success("AAPS绑定到AIDL服务");
+public IBinder onBind(Intent intent) {
+    logger.step("服务绑定", "开始");
+    
+    if (intent == null) {
+        logger.warn("绑定请求intent为null，返回AIDL binder");
         return binder;
     }
+    
+    String action = intent.getAction();
+    String packageName = intent.getPackage();
+    String component = intent.getComponent() != null ? 
+                       intent.getComponent().getClassName() : "null";
+    
+    logger.debug("绑定请求详情:");
+    logger.debug("  Action: " + action);
+    logger.debug("  Package: " + packageName);
+    logger.debug("  Component: " + component);
+    logger.debug("  Extras: " + (intent.getExtras() != null ? 
+               intent.getExtras().toString() : "none"));
+    
+    // 检查是否是AAPS客户端
+    boolean isAAPS = false;
+    boolean isInternal = false;
+    
+    if (packageName != null) {
+        isAAPS = packageName.contains("androidaps") || 
+                 packageName.contains("aaps") ||
+                 packageName.equals("com.eveningoutpost.dexdrip");
+        isInternal = packageName.equals(getPackageName());
+        
+        logger.debug("包名分析:");
+        logger.debug("  是否AAPS: " + isAAPS);
+        logger.debug("  是否内部: " + isInternal);
+    }
+    
+    // 关键修复：给外部应用（包括AAPS）返回AIDL binder
+    if (isInternal && action != null && "local".equals(action)) {
+        logger.success("内部绑定，返回LocalBinder");
+        return localBinder;
+    } else {
+        // 默认返回AIDL binder给所有外部调用
+        logger.success("外部绑定，返回AIDL Binder");
+        logger.debug("Binder类型: " + binder.getClass().getName());
+        return binder;
+    }
+}
     
     @Override
     public boolean onUnbind(Intent intent) {
