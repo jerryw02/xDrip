@@ -11,6 +11,10 @@ import android.os.IBinder;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 
+// 在 BgDataService.java 文件开头的import部分添加：
+import android.content.ComponentName;
+import android.os.Bundle;
+
 import androidx.core.app.NotificationCompat;
 
 import com.eveningoutpost.dexdrip.utils.AIDLLogger;
