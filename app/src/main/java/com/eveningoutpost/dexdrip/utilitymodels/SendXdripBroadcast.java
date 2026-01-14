@@ -276,6 +276,63 @@ public class SendXdripBroadcast {
             }
         }
     }
+
+    /**
+     * 启动BgDataService - 改进版
+     */
+    private static void startBgDataService() {
+        try {
+            Context context = getAppContext();
+            
+            // 先检查服务是否已经在运行
+            if (isServiceRunning(context, BgDataService.class)) {
+                UserError.Log.i(TAG, "服务已经在运行，无需重复启动");
+                return;
+            }
+            
+            // 创建启动Intent
+            Intent serviceIntent = new Intent(context, BgDataService.class);
+            serviceIntent.setPackage(context.getPackageName());
+            serviceIntent.setAction("internal");
+            
+            // 添加标记，让onBind能正确识别
+            serviceIntent.putExtra("caller", "SendXdripBroadcast");
+            serviceIntent.putExtra("timestamp", System.currentTimeMillis());
+            
+            UserError.Log.i(TAG, "正在启动BgDataService...");
+            
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent);
+            } else {
+                context.startService(serviceIntent);
+            }
+            
+            UserError.Log.i(TAG, "BgDataService启动请求已发送");
+            
+        } catch (Exception e) {
+            UserError.Log.e(TAG, "启动服务失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 检查服务是否正在运行
+     */
+    private static boolean isServiceRunning(Context context, Class<?> serviceClass) {
+        try {
+            android.app.ActivityManager manager = 
+                (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            
+            for (android.app.ActivityManager.RunningServiceInfo service : 
+                 manager.getRunningServices(Integer.MAX_VALUE)) {
+                if (serviceClass.getName().equals(service.service.getClassName())) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            UserError.Log.e(TAG, "检查服务运行状态失败: " + e.getMessage());
+        }
+        return false;
+    }
     
     /**
      * 通知xdrip.java启动AIDL服务
