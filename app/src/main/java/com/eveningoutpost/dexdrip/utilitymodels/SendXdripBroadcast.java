@@ -92,21 +92,15 @@ public class SendXdripBroadcast {
             // 提取血糖数据的正确方法
             double glucose = extractGlucoseValue(intent, bundle);
             long timestamp = extractTimestampValue(intent, bundle);
-            //String direction = extractDirectionValue(intent, bundle);
-            //double noise = extractNoiseValue(intent, bundle);
+            String direction = extractDirectionValue(intent, bundle);
+            double noise = extractNoiseValue(intent, bundle);
 
             // 验证提取的数据
             if (glucose == 0.0) {
                 UserError.Log.uel(TAG, "⚠️ 警告：提取到血糖值为0.0，可能数据提取方式不正确");
                 // 可以尝试再次从其他来源获取数据
             }
-            
-            // 从Intent中提取数据
-            //long timestamp = intent.getLongExtra(Intents.EXTRA_TIMESTAMP, System.currentTimeMillis());
-            //double glucose = intent.getDoubleExtra(Intents.EXTRA_BG_ESTIMATE, 0.0);
-            //String direction = intent.getStringExtra(Intents.EXTRA_BG_SLOPE_NAME);
-            //double noise = intent.getDoubleExtra(Intents.EXTRA_NOISE, 0.0);
-            
+                                
             // 创建BgData对象
             BgData bgData = new BgData();
             bgData.setTimestamp(timestamp);
@@ -133,13 +127,13 @@ public class SendXdripBroadcast {
     private static double extractGlucoseValue(Intent intent, Bundle bundle) {
         // 尝试多种可能的键名
         String[] possibleKeys = {
-            "BgEstimate",                            // 最可能的短键名
-            "com.eveningoutpost.dexdrip.Extras.BgEstimate", // 完整键名
-            "com.eveningoutpost.dexdrip.BgEstimate",        // 另一种完整键名
-            "glucose",                              // 通用键名
-            "GlucoseValue",                              // 通用键名
-            "value",                                // 可能的值键名
-            "EXTRA_BG_ESTIMATE"                     // 常量名
+            "BgEstimate",                                       // 最可能的短键名
+            "com.eveningoutpost.dexdrip.Extras.BgEstimate",     // 完整键名
+            "com.eveningoutpost.dexdrip.BgEstimate",            // 另一种完整键名
+            "glucose",                                          // 通用键名
+            "GlucoseValue",                                     // 通用键名
+            "value",                                            // 可能的值键名
+            "EXTRA_BG_ESTIMATE"                                 // 常量名
         };
         
         for (String key : possibleKeys) {
@@ -227,6 +221,80 @@ public class SendXdripBroadcast {
         
         return System.currentTimeMillis();
     }
+
+    /**
+     * 提取趋势方向
+     */
+    private static String extractDirectionValue(Intent intent, Bundle bundle) {
+        // 尝试多种可能的键名
+        String[] possibleKeys = {
+            "BgSlopeName",
+            "BgSlope",
+            "com.eveningoutpost.dexdrip.Extras.BgSlopeName",
+            "direction",
+            "trend",
+            "slope",
+            "EXTRA_BG_SLOPE_NAME",            
+        };
+        
+        for (String key : possibleKeys) {
+            try {
+                // 从bundle尝试
+                if (bundle != null) {
+                    String value = bundle.getString(key);
+                    if (value != null && !value.isEmpty()) {
+                        return value;
+                    }
+                }
+                
+                // 从intent尝试
+                String value = intent.getStringExtra(key);
+                if (value != null && !value.isEmpty()) {
+                    return value;
+                }
+            } catch (Exception e) {
+                // 忽略错误，尝试下一个键名
+            }
+        }
+        
+        return "";
+    }
+    
+    /**
+     * 提取噪声值
+     */
+    private static double extractNoiseValue(Intent intent, Bundle bundle) {
+        // 尝试多种可能的键名
+        String[] possibleKeys = {
+            "Noise",
+            "com.eveningoutpost.dexdrip.Extras.Noise",
+            "bg_noise",
+            "EXTRA_NOISE",
+        };
+        
+        for (String key : possibleKeys) {
+            try {
+                // 从bundle尝试
+                if (bundle != null && bundle.containsKey(key)) {
+                    Object value = bundle.get(key);
+                    if (value instanceof Double) {
+                        return (Double) value;
+                    } else if (value instanceof Float) {
+                        return (double) (Float) value;
+                    }
+                }
+                
+                // 从intent尝试
+                if (intent.hasExtra(key)) {
+                    return intent.getDoubleExtra(key, 0.0);
+                }
+            } catch (Exception e) {
+                // 忽略错误，尝试下一个键名
+            }
+        }
+        
+        return 0.0;
+    }
     
     /**
      * 通过静态方法注入数据到服务
@@ -278,7 +346,7 @@ public class SendXdripBroadcast {
     }
 
     /**
-     * 启动BgDataService - 改进版
+     * 启动BgDataService 
      */
     private static void startBgDataService() {
         try {
