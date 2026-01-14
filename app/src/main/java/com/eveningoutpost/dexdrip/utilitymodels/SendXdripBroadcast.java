@@ -70,19 +70,53 @@ public class SendXdripBroadcast {
         }
         
         try {
+            // 调试：打印所有可用的Extra键名
+            if (intent.getExtras() != null) {
+                UserError.Log.uel(TAG, "Intent Extras Keys: " + intent.getExtras().keySet());
+                for (String key : intent.getExtras().keySet()) {
+                    Object value = intent.getExtras().get(key);
+                    UserError.Log.uel(TAG, "  " + key + " = " + value + " (type: " + 
+                                   (value != null ? value.getClass().getSimpleName() : "null") + ")");
+                }
+            }
+            
+            if (bundle != null) {
+                UserError.Log.uel(TAG, "Bundle Keys: " + bundle.keySet());
+                for (String key : bundle.keySet()) {
+                    Object value = bundle.get(key);
+                    UserError.Log.uel(TAG, "  " + key + " = " + value + " (type: " + 
+                                   (value != null ? value.getClass().getSimpleName() : "null") + ")");
+                }
+            }
+            
+            // 提取血糖数据的正确方法
+            double glucose = extractGlucoseValue(intent, bundle);
+            long timestamp = extractTimestampValue(intent, bundle);
+            //String direction = extractDirectionValue(intent, bundle);
+            //double noise = extractNoiseValue(intent, bundle);
+
+            // 验证提取的数据
+            if (glucose == 0.0) {
+                UserError.Log.uel(TAG, "⚠️ 警告：提取到血糖值为0.0，可能数据提取方式不正确");
+                // 可以尝试再次从其他来源获取数据
+            }
+            
             // 从Intent中提取数据
-            long timestamp = intent.getLongExtra(Intents.EXTRA_TIMESTAMP, System.currentTimeMillis());
-            double glucose = intent.getDoubleExtra(Intents.EXTRA_BG_ESTIMATE, 0.0);
+            //long timestamp = intent.getLongExtra(Intents.EXTRA_TIMESTAMP, System.currentTimeMillis());
+            //double glucose = intent.getDoubleExtra(Intents.EXTRA_BG_ESTIMATE, 0.0);
             //String direction = intent.getStringExtra(Intents.EXTRA_BG_SLOPE_NAME);
             //double noise = intent.getDoubleExtra(Intents.EXTRA_NOISE, 0.0);
             
             // 创建BgData对象
             BgData bgData = new BgData();
-            bgData.timestamp = timestamp;
-            bgData.glucoseValue = glucose;
-            //bgData.direction = direction != null ? direction : "";
-            //bgData.noise = noise;
-            bgData.source = "xDrip";
+            bgData.setTimestamp(timestamp);
+            bgData.setGlucoseValue(glucose);
+            //bgData.setDirection(direction != null ? direction : "");
+            //bgData.setNoise(noise);
+            bgData.setSource("xDrip");
+
+            UserError.Log.uel(TAG, "📊 提取的血糖数据 - Glucose: " + glucose + 
+                            ", Time: " + timestamp);
             
             // 注入数据到AIDL服务
             injectToService(bgData);
@@ -92,6 +126,107 @@ public class SendXdripBroadcast {
         } catch (Exception e) {
             UserError.Log.uel(TAG, "❌ AIDL数据注入失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 提取血糖值 - 尝试多种可能的键名
+     */
+    private static double extractGlucoseValue(Intent intent, Bundle bundle) {
+        // 尝试多种可能的键名
+        String[] possibleKeys = {
+            "BgEstimate",                            // 最可能的短键名
+            "com.eveningoutpost.dexdrip.Extras.BgEstimate", // 完整键名
+            "com.eveningoutpost.dexdrip.BgEstimate",        // 另一种完整键名
+            "glucose",                              // 通用键名
+            "GlucoseValue",                              // 通用键名
+            "value",                                // 可能的值键名
+            "EXTRA_BG_ESTIMATE"                     // 常量名
+        };
+        
+        for (String key : possibleKeys) {
+            try {
+                // 先从bundle尝试
+                if (bundle != null && bundle.containsKey(key)) {
+                    Object value = bundle.get(key);
+                    if (value instanceof Double) {
+                        UserError.Log.uel(TAG, "✅ 从Bundle找到血糖值: " + key + " = " + value);
+                        return (Double) value;
+                    } else if (value instanceof Float) {
+                        UserError.Log.uel(TAG, "✅ 从Bundle找到血糖值(Float): " + key + " = " + value);
+                        return (double) (Float) value;
+                    } else if (value instanceof String) {
+                        UserError.Log.uel(TAG, "✅ 从Bundle找到血糖值(String): " + key + " = " + value);
+                        return Double.parseDouble((String) value);
+                    }
+                }
+                
+                // 再从intent尝试
+                if (intent.hasExtra(key)) {
+                    double value = intent.getDoubleExtra(key, 0.0);
+                    if (value != 0.0) {
+                        UserError.Log.uel(TAG, "✅ 从Intent找到血糖值: " + key + " = " + value);
+                        return value;
+                    }
+                }
+            } catch (Exception e) {
+                UserError.Log.uel(TAG, "提取血糖值失败(key=" + key + "): " + e.getMessage());
+            }
+        }
+        
+        // 最后尝试直接检查所有值
+        if (bundle != null) {
+            for (String key : bundle.keySet()) {
+                if (key != null && (key.toLowerCase().contains("bg") || 
+                                    key.toLowerCase().contains("glucose") || 
+                                    key.toLowerCase().contains("estimate"))) {
+                    Object value = bundle.get(key);
+                    UserError.Log.uel(TAG, "🔍 可能匹配的血糖键: " + key + " = " + value);
+                }
+            }
+        }
+        
+        return 0.0;
+    }
+    
+    /**
+     * 提取时间戳
+     */
+    private static long extractTimestampValue(Intent intent, Bundle bundle) {
+        // 尝试多种可能的键名
+        String[] possibleKeys = {
+            "BgTimestamp",
+            "com.eveningoutpost.dexdrip.Extras.BgTimestamp",
+            "timestamp",
+            "time",
+            "EXTRA_BG_TIMESTAMP"
+            "EXTRA_TIMESTAMP"
+        };
+        
+        for (String key : possibleKeys) {
+            try {
+                // 从bundle尝试
+                if (bundle != null && bundle.containsKey(key)) {
+                    Object value = bundle.get(key);
+                    if (value instanceof Long) {
+                        return (Long) value;
+                    } else if (value instanceof String) {
+                        return Long.parseLong((String) value);
+                    }
+                }
+                
+                // 从intent尝试
+                if (intent.hasExtra(key)) {
+                    long value = intent.getLongExtra(key, System.currentTimeMillis());
+                    if (value > 0) {
+                        return value;
+                    }
+                }
+            } catch (Exception e) {
+                // 忽略错误，尝试下一个键名
+            }
+        }
+        
+        return System.currentTimeMillis();
     }
     
     /**
