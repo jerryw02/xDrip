@@ -88,7 +88,7 @@ public class SendXdripBroadcast {
                                    (value != null ? value.getClass().getSimpleName() : "null") + ")");
                 }
             }
-            
+          
             // 提取血糖数据的正确方法
             double glucose = extractGlucoseValue(intent, bundle);
             long timestamp = extractTimestampValue(intent, bundle);
@@ -115,8 +115,7 @@ public class SendXdripBroadcast {
             //bgData.setNoise(noise);
             bgData.setSource("xDrip");
 
-            UserError.Log.uel(TAG, "📊 提取的血糖数据 - Glucose: " + glucose + 
-                            ", Time: " + timestamp);
+            UserError.Log.uel(TAG, "📊 提取的血糖数据 - Glucose: " + glucose + ", Time: " + timestamp);
             
             // 注入数据到AIDL服务
             injectToService(bgData);
@@ -198,8 +197,8 @@ public class SendXdripBroadcast {
             "com.eveningoutpost.dexdrip.Extras.BgTimestamp",
             "timestamp",
             "time",
-            "EXTRA_BG_TIMESTAMP"
-            "EXTRA_TIMESTAMP"
+            "EXTRA_BG_TIMESTAMP",
+            "EXTRA_TIMESTAMP",
         };
         
         for (String key : possibleKeys) {
