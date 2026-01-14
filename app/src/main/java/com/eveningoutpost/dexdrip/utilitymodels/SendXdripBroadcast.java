@@ -71,7 +71,7 @@ public class SendXdripBroadcast {
         
         try {
             // 从Intent中提取数据
-            long timestamp = intent.getLongExtra(Intents.EXTRA_BG_TIMESTAMP, System.currentTimeMillis());
+            long timestamp = intent.getLongExtra(Intents.EXTRA_TIMESTAMP, System.currentTimeMillis());
             double glucose = intent.getDoubleExtra(Intents.EXTRA_BG_ESTIMATE, 0.0);
             //String direction = intent.getStringExtra(Intents.EXTRA_BG_SLOPE_NAME);
             //double noise = intent.getDoubleExtra(Intents.EXTRA_NOISE, 0.0);
