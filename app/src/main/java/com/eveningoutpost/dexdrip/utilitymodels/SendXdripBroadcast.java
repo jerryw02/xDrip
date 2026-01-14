@@ -1,6 +1,7 @@
 package com.eveningoutpost.dexdrip.utilitymodels;
 
 import android.content.Intent;
+import android.content.Context;
 import android.os.Bundle;
 
 import com.eveningoutpost.dexdrip.models.UserError;
