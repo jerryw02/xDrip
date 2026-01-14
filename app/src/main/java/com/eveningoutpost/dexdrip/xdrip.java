@@ -45,8 +45,6 @@ import net.danlew.android.joda.JodaTimeAndroid;
 
 import java.util.Locale;
 
-
-
 /**
  * Created by Emma Black on 3/21/15.
  */
@@ -69,7 +67,7 @@ public class xdrip extends Application {
     private boolean isBgDataServiceBound = false;
     private ServiceConnection bgServiceConnection;
     private com.eveningoutpost.dexdrip.utils.AIDLLogger aidlLogger;
-    // =============== AIDL 结束 ===============
+    //       =============== AIDL 结束 ===============
 
     public static void setContext(final Context context) {
         if (context == null) return;
@@ -94,7 +92,7 @@ public class xdrip extends Application {
         
         // =============== AIDL 服务初始化（新增） ===============
         initAIDLService();
-        // =============== AIDL 结束 ===============
+        //      =============== AIDL 结束 ===============
         
         JodaTimeAndroid.init(this);
         try {
@@ -327,9 +325,9 @@ public class xdrip extends Application {
     /**
      * 获取BgDataService实例（供BroadcastService使用）
      */
-    public BgDataService getBgDataService() {
-        return bgDataService;
-    }
+    //public BgDataService getBgDataService() {
+    //    return bgDataService;
+    //}
     
     /**
      * 检查BgDataService是否已绑定
