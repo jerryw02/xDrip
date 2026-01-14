@@ -1,18 +1,5 @@
 package com.eveningoutpost.dexdrip.services.broadcastservice;
 
-import com.eveningoutpost.dexdrip.IBgDataService; // 替换为你的 AIDL 接口的实际包名
-import com.eveningoutpost.dexdrip.IBgDataCallback; // 添加这行
-import com.eveningoutpost.dexdrip.BgData; // 替换为你的实际包名
-
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import android.content.ServiceConnection;
-
-import android.content.ComponentName;
-import android.os.RemoteException;
-import android.util.Log;
-
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -64,9 +51,6 @@ import static com.eveningoutpost.dexdrip.utilitymodels.Constants.DAY_IN_MS;
 import static com.eveningoutpost.dexdrip.wearintegration.ExternalStatusService.getLastStatusLine;
 import static com.eveningoutpost.dexdrip.wearintegration.ExternalStatusService.getLastStatusLineTime;
 
-// AIDL相关导入
-import com.eveningoutpost.dexdrip.utils.AIDLLogger;
-
 /**
  *  Broadcast API which provides common data like, bg values, graph info, statistic info.
  *  Also it can handle different alarms, save HR data, steps and treatments.
@@ -99,12 +83,6 @@ public class BroadcastService extends Service {
     protected Map<String, BroadcastModel> broadcastEntities;
 
     protected KeyStore keyStore = FastStore.getInstance();
-    
-    // =============== AIDL 相关变量（新增） ===============
-    private AIDLLogger aidlLogger;
-    private long lastAIDLSendTime = 0;
-    private static final long MIN_AIDL_INTERVAL = 1000; // 1秒最小间隔
-    // =============== AIDL 结束 ===============
 
     /**
      *  The receiver listening {@link  ACTION_WATCH_COMMUNICATION_RECEIVER} action.
@@ -239,311 +217,11 @@ public class BroadcastService extends Service {
         }
     };
 
-    /**
-     * 客户端调用 bindService 时，系统会回调此方法
-     * 返回值是一个 IBinder 对象，客户端将用它来获取服务端的代理
-     */
     @Override
     public IBinder onBind(Intent intent) {
-        String action = intent.getAction();
-        UserError.Log.d(TAG, "收到绑定请求: " + action + ". 返回 Binder 实例。");
-
-        // 返回我们在上面定义的 Stub 实例
-        //return mBinder;
         return null;
     }
 
-    /**
-     * 当所有客户端都解绑时，系统调用此方法
-     * 如果返回 true，下次有客户端绑定时会再次调用 onBind
-     */
-    @Override
-    public boolean onUnbind(Intent intent) {
-        UserError.Log.d(TAG, "所有客户端已解绑");
-        //return super.onUnbind(intent);
-        return false;
-        // 如果你希望服务在没有客户端时自动停止，可以在这里 stopSelf()
-    }
-    
-    // =============== AIDL 核心方法（新增） ===============
-    
-    /**
-     * 核心AIDL发送方法
-     * 在handleCommand方法中调用
-     */
-    private void actuallySendData(BroadcastModel broadcastModel) {
-        if (aidlLogger != null) {
-            aidlLogger.step("AIDL发送", "开始", 
-                "model:" + (broadcastModel != null ? broadcastModel.toString() : "null"));
-        }
-        
-        if (broadcastModel == null) {
-            if (aidlLogger != null) {
-                aidlLogger.error("BroadcastModel为空");
-            }
-            return;
-        }
-        
-        // 限流检查
-        long currentTime = System.currentTimeMillis();
-        if (currentTime - lastAIDLSendTime < MIN_AIDL_INTERVAL) {
-            if (aidlLogger != null) {
-                aidlLogger.debug("发送限流，跳过");
-            }
-            return;
-        }
-        lastAIDLSendTime = currentTime;
-        
-        try {
-            // 准备数据
-            Bundle bundle = prepareBgBundle(broadcastModel);
-            if (bundle == null || bundle.isEmpty()) {
-                if (aidlLogger != null) {
-                    aidlLogger.warn("Bundle为空");
-                }
-                return;
-            }
-            
-            // 转换为BgData
-            BgData bgData = convertBundleToBgData(bundle);
-            if (bgData == null) {
-                if (aidlLogger != null) {
-                    aidlLogger.error("BgData转换失败");
-                }
-                return;
-            }
-            
-            // 检查数据有效性
-            if (bgData.getGlucoseValue() <= 0) {
-                if (aidlLogger != null) {
-                    aidlLogger.warn("血糖值无效: " + bgData.getGlucoseValue());
-                }
-                return;
-            }
-            
-            if (aidlLogger != null) {
-                aidlLogger.debug("数据准备完成: " + bgData.toString());
-            }
-            
-            // 通过BgDataService发送数据
-            boolean sent = sendToBgDataService(bgData);
-            
-            if (aidlLogger != null) {
-                if (sent) {
-                    aidlLogger.success("AIDL数据发送成功");
-                } else {
-                    aidlLogger.error("AIDL数据发送失败");
-                }
-            }
-            
-        } catch (Exception e) {
-            if (aidlLogger != null) {
-                aidlLogger.error("AIDL发送异常: " + e.getMessage());
-            }
-        }
-    }
-    
-    /**
-     * 通过BgDataService发送数据
-     */
-    private boolean sendToBgDataService(BgData bgData) {
-        if (aidlLogger != null) {
-            aidlLogger.step("发送数据", "开始");
-        }
-        
-        try {
-            // 从Application获取BgDataService
-            // 注意：这里需要xdrip类有getInstance()和getBgDataService()方法
-            if (xdrip.getInstance() == null) {
-                if (aidlLogger != null) {
-                    aidlLogger.error("xdrip实例为空");
-                }
-                return false;
-            }
-            
-            // 假设xdrip类有getBgDataService()方法
-            // 这里需要您根据xdrip的实际实现调整
-            com.eveningoutpost.dexdrip.BgDataService bgDataService = null;
-            boolean isBound = false;
-            
-            // 尝试通过反射或直接调用获取BgDataService
-            try {
-                // 方法1：如果xdrip有公共方法
-                bgDataService = xdrip.getInstance().getBgDataService();
-                isBound = xdrip.getInstance().isBgDataServiceBound();
-            } catch (Exception e) {
-                // 方法2：记录错误
-                if (aidlLogger != null) {
-                    aidlLogger.error("获取BgDataService失败: " + e.getMessage());
-                }
-            }
-            
-            if (!isBound || bgDataService == null) {
-                if (aidlLogger != null) {
-                    aidlLogger.warn("BgDataService未绑定或为空");
-                }
-                return false;
-            }
-            
-            bgDataService.injectBgData(bgData);
-            if (aidlLogger != null) {
-                aidlLogger.logDataSend("BgDataService", bgData, true);
-            }
-            return true;
-            
-        } catch (Exception e) {
-            if (aidlLogger != null) {
-                aidlLogger.error("BgDataService发送失败: " + e.getMessage());
-                aidlLogger.logDataSend("BgDataService", bgData, false);
-            }
-            return false;
-        }
-    }
-    
-    /**
-     * 将Bundle转换为BgData对象
-     */
-    private BgData convertBundleToBgData(Bundle bundle) {
-        if (bundle == null) {
-            return null;
-        }
-        
-        try {
-            BgData bgData = new BgData();
-            
-            // 血糖值
-            double glucose = 0;
-            if (bundle.containsKey("bg.valueMgdl")) {
-                glucose = bundle.getDouble("bg.valueMgdl", 0);
-            }
-            bgData.setGlucoseValue(glucose);
-            
-            // 时间戳
-            long timestamp = 0;
-            if (bundle.containsKey("bg.timeStamp")) {
-                timestamp = bundle.getLong("bg.timeStamp", System.currentTimeMillis());
-            }
-            bgData.setTimestamp(timestamp);
-            
-            // 趋势方向（从deltaName转换）
-            int trend = 0;
-            if (bundle.containsKey("bg.deltaName")) {
-                String deltaName = bundle.getString("bg.deltaName", "");
-                trend = convertDirectionToTrend(deltaName);
-            }
-            bgData.setTrend(trend);
-            
-            // 变化率
-            double delta = 0;
-            if (bundle.containsKey("bg.deltaValueMgdl")) {
-                delta = bundle.getDouble("bg.deltaValueMgdl", 0);
-            }
-            bgData.setDelta(delta);
-            
-            // 数据源
-            String source = "xDrip-Broadcast";
-            if (bundle.containsKey("bg.plugin")) {
-                String plugin = bundle.getString("bg.plugin", "");
-                if (!plugin.isEmpty()) {
-                    source = "xDrip-" + plugin;
-                }
-            }
-            bgData.setSource(source);
-            
-            // 数据可靠性
-            boolean reliable = true;
-            if (bundle.containsKey("bg.isStale")) {
-                boolean isStale = bundle.getBoolean("bg.isStale", false);
-                reliable = !isStale;
-            }
-            bgData.setReliable(reliable);
-            
-            // 序列号（用于去重）
-            bgData.setSequenceNumber(System.currentTimeMillis());
-            
-            if (aidlLogger != null) {
-                aidlLogger.debug("Bundle转换完成: " + bgData.toString());
-            }
-            return bgData;
-            
-        } catch (Exception e) {
-            if (aidlLogger != null) {
-                aidlLogger.error("Bundle转换异常: " + e.getMessage());
-            }
-            return null;
-        }
-    }
-    
-    /**
-     * 将方向字符串转换为趋势值
-     */
-    private int convertDirectionToTrend(String direction) {
-        if (direction == null || direction.isEmpty()) {
-            return 0;
-        }
-        
-        switch (direction.toLowerCase()) {
-            case "doubledown":
-            case "↓↓":
-                return -2;
-            case "singledown":
-            case "↓":
-            case "fortyfivedown":
-                return -1;
-            case "flat":
-            case "→":
-            case "steady":
-                return 0;
-            case "singleup":
-            case "↑":
-            case "fortyfiveup":
-                return 1;
-            case "doubleup":
-            case "↑↑":
-                return 2;
-            default:
-                return 0;
-        }
-    }
-    
-    // =============== AIDL 结束 ===============
-    
-    //// 1. 声明服务端 Stub 实例
-    //private final IBgDataService.Stub mBinder = new IBgDataService.Stub() {
-    //    @Override
-    //    public void registerCallback(IBgDataCallback callback) throws RemoteException {
-    //        if (callback != null && !mCallbackList.contains(callback)) {
-    //            mCallbackList.add(callback);
-    //            UserError.Log.d(TAG, "AAPS 客户端注册成功。当前客户端数量: " + mCallbackList.size());
-    //        }
-    //    }
-
-    //    @Override
-    //    public void unregisterCallback(IBgDataCallback callback) throws RemoteException {
-    //        mCallbackList.remove(callback);
-    //        UserError.Log.d(TAG, "AAPS 客户端注销。剩余客户端数量: " + mCallbackList.size());
-    //    }
-
-    //    @Override
-    //    public void updateBgData(BgData data) throws RemoteException {
-    //        // 如果 AAPS 主动推送数据给 xDrip（通常不需要），可在这里处理
-    //        // 否则留空或抛异常
-    //        UserError.Log.w(TAG, "updateBgData called but not implemented");
-    //    }
-        
-    //    @Override
-    //    public BgData getLatestBgData() throws RemoteException {
-    //        // 实现获取最新血糖数据
-    //        UserError.Log.d(TAG, "getLatestBgData called");
-    //        return null; // 需要实际实现
-    //    }
-    //};
-
-    // 2. 使用线程安全的列表存储回调，防止并发修改异常
-    //private final List<IBgDataCallback> mCallbackList = new CopyOnWriteArrayList<>();
-
-    
-    
     /**
      * When service started it's will send a broadcast message CMD_START for thirdparty
      * applications and waiting for commands from applications by listening broadcastReceiver.
@@ -555,33 +233,17 @@ public class BroadcastService extends Service {
         broadcastEntities = new HashMap<>();
         registerReceiver(broadcastReceiver, new IntentFilter(ACTION_WATCH_COMMUNICATION_RECEIVER));
 
-        // =============== AIDL 初始化（新增） ===============
-        // 初始化AIDL日志
-        aidlLogger = AIDLLogger.getInstance();
-        if (aidlLogger != null) {
-            aidlLogger.logServiceStatus("BroadcastService", "创建");
-        }
-        // =============== AIDL 初始化结束 ===============
-
         JoH.startService(BroadcastService.class, Const.INTENT_FUNCTION_KEY, Const.CMD_START);
 
         super.onCreate();
-       
     }
 
     @Override
     public void onDestroy() {
         UserError.Log.e(TAG, "killing service");
-        
-        // =============== AIDL 清理（新增） ===============
-        if (aidlLogger != null) {
-            aidlLogger.logServiceStatus("BroadcastService", "销毁");
-        }
-        // =============== AIDL 清理结束 ===============
-        
         broadcastEntities.clear();
         unregisterReceiver(broadcastReceiver);
-        super.onDestroy();       
+        super.onDestroy();
     }
 
     @Override
@@ -595,7 +257,7 @@ public class BroadcastService extends Service {
                         try {
                             handleCommand(function, intent);
                         } catch (Exception e) {
-                            UserError.Log.e(TAG, "handleCommand Error: " + e.getMessage());
+                            UserError.Log.e(TAG, "handleCommand Error: " + e.toString());
                         }
                     } else {
                         UserError.Log.d(TAG, "onStartCommand called without function");
@@ -623,16 +285,6 @@ public class BroadcastService extends Service {
         boolean handled = false;
         BroadcastModel broadcastModel;
         Bundle bundle = null;
-        
-        // 血糖数据相关命令的预处理
-        if (function.equals(Const.CMD_UPDATE_BG) || 
-            function.equals(Const.CMD_UPDATE_BG_FORCE)) {
-            
-            if (aidlLogger != null) {
-                aidlLogger.info("收到血糖数据命令: " + function);
-            }
-        }
-        
         //send to all connected apps
         for (Map.Entry<String, BroadcastModel> entry : broadcastEntities.entrySet()) {
             receiver = entry.getKey();
@@ -641,12 +293,7 @@ public class BroadcastService extends Service {
                 case Const.CMD_UPDATE_BG:
                     handled = true;
                     bundle = prepareBgBundle(broadcastModel);
-                
-                    // =============== 插入AIDL发送（新增） ===============
-                    actuallySendData(broadcastModel);
-                    // =============== AIDL 结束 ===============
-                                    
-                    sendBroadcast(function, receiver, bundle);                    
+                    sendBroadcast(function, receiver, bundle);
                     break;
                 case Const.CMD_ALERT:
                     handled = true;
@@ -681,11 +328,6 @@ public class BroadcastService extends Service {
             case Const.CMD_UPDATE_BG_FORCE:
                 broadcastModel = broadcastEntities.get(receiver);
                 bundle = prepareBgBundle(broadcastModel);
-
-                // =============== 插入AIDL发送（新增） ===============
-                actuallySendData(broadcastModel);
-                // =============== AIDL 结束 ===============
-                
                 break;
             case Const.CMD_CANCEL_ALERT:
                 receiver = null; //broadcast
@@ -739,7 +381,7 @@ public class BroadcastService extends Service {
             default:
                 return;
         }
-        sendBroadcast(function, receiver, bundle);       
+        sendBroadcast(function, receiver, bundle);
     }
 
     /**
@@ -749,22 +391,9 @@ public class BroadcastService extends Service {
      * @param bundle If specified, would be added to broadcast {@link Intent}
      */
     protected void sendBroadcast(String function, String receiver, Bundle bundle) {
-
-        ////////////////////////////
-
-        try {
-        // 使用UserError.Log，这是xDrip的标准日志方法
-        UserError.Log.uel("AIDL-TEST", "sendBroadcast被调用: " + function);
-    } catch (Exception e) {
-        UserError.Log.uel("AIDL", "sendBroadcast被调用: " + function);
-    }
-
-        //////////////////////////// 
-        
-        
         Intent intent = new Intent(ACTION_WATCH_COMMUNICATION_SENDER);
         UserError.Log.d(TAG, String.format("sendBroadcast functionName: %s, receiver: %s", function, receiver));
-       
+
         if (function == null || function.isEmpty()) {
             UserError.Log.d(TAG, "Error, function not specified");
             return;
@@ -931,7 +560,7 @@ public class BroadcastService extends Service {
             // External status line from AAPS added
             bundle.putString("external.statusLine", getLastStatusLine());
             bundle.putLong("external.timeStamp", getLastStatusLineTime());
-            
+
         }
         return bundle;
     }
