@@ -2,6 +2,7 @@ package com.eveningoutpost.dexdrip.utilitymodels;
 
 import android.content.Intent;
 import android.os.Bundle;
+
 import com.eveningoutpost.dexdrip.models.UserError;
 import com.eveningoutpost.dexdrip.BgData;
 import com.eveningoutpost.dexdrip.BgDataService;
@@ -72,15 +73,15 @@ public class SendXdripBroadcast {
             // 从Intent中提取数据
             long timestamp = intent.getLongExtra(Intents.EXTRA_BG_TIMESTAMP, System.currentTimeMillis());
             double glucose = intent.getDoubleExtra(Intents.EXTRA_BG_ESTIMATE, 0.0);
-            String direction = intent.getStringExtra(Intents.EXTRA_BG_SLOPE_NAME);
-            double noise = intent.getDoubleExtra(Intents.EXTRA_NOISE, 0.0);
+            //String direction = intent.getStringExtra(Intents.EXTRA_BG_SLOPE_NAME);
+            //double noise = intent.getDoubleExtra(Intents.EXTRA_NOISE, 0.0);
             
             // 创建BgData对象
             BgData bgData = new BgData();
             bgData.timestamp = timestamp;
             bgData.glucose = glucose;
-            bgData.direction = direction != null ? direction : "";
-            bgData.noise = noise;
+            //bgData.direction = direction != null ? direction : "";
+            //bgData.noise = noise;
             bgData.source = "xDrip";
             
             // 通过ServiceHelper注入数据到AIDL服务
