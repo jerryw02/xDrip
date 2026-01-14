@@ -229,26 +229,51 @@ public class SendXdripBroadcast {
     }
     
     /**
-     * 注入数据
+     * 通过静态方法注入数据到服务
      * 这里使用静态方法调用，让xdrip.java管理服务绑定
      */
+    
     private static void injectToService(BgData bgData) {
-        try {
-            // 方法1：尝试通过本地Binder注入（如果服务已启动）
-            if (BgDataService.getInstance() != null) {
-                BgDataService.getInstance().injectBgData(bgData);
-                return;
+        // 最大重试次数
+        final int MAX_RETRY = 2;
+        
+        for (int retry = 0; retry <= MAX_RETRY; retry++) {
+            try {
+                // 尝试获取服务实例
+                BgDataService service = BgDataService.getInstance();
+                
+                if (service != null) {
+                    // 服务存在，注入数据
+                    service.injectBgData(bgData);
+                    UserError.Log.d(TAG, "✅ AIDL数据注入成功: " + bgData.getGlucose() + " at " + bgData.getTimestamp());
+                    return; // 成功，退出
+                } else {
+                    // 服务不存在
+                    if (retry == 0) {
+                        UserError.Log.w(TAG, "⚠️ AIDL服务未就绪，尝试启动服务...");
+                        startBgDataService();
+                        
+                        // 等待服务启动
+                        Thread.sleep(300);
+                    } else {
+                        UserError.Log.w(TAG, "⚠️ AIDL服务未就绪，数据暂存 (重试 " + retry + "/" + MAX_RETRY + ")");
+                        
+                        // 只在第一次重试时等待，后续快速失败
+                        if (retry < MAX_RETRY) {
+                            Thread.sleep(100);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                UserError.Log.e(TAG, "注入服务异常 (重试 " + retry + "): " + e.getMessage());
+                if (retry < MAX_RETRY) {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
             }
-            
-            // 方法2：通过xdrip应用实例获取服务引用
-            // 这里假设xdrip.java中提供了获取服务引用的静态方法
-            // 例如：BgDataService.getServiceInstance()
-            
-            UserError.Log.uel(TAG, "⚠️ AIDL服务未就绪，数据暂存");
-            // TODO: 可以在这里实现数据暂存逻辑，等待服务就绪后再注入
-            
-        } catch (Exception e) {
-            UserError.Log.uel(TAG, "注入服务异常: " + e.getMessage());
         }
     }
     
