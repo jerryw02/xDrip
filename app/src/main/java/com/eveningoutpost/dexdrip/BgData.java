@@ -4,15 +4,15 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 public class BgData implements Parcelable {
-    private double glucoseValue;
-    private long timestamp;
-    private int trend;
-    private double delta;
-    private String source;
-    private boolean isReliable;
+    public double glucoseValue;
+    public long timestamp;
+    public int trend;
+    public double delta;
+    public String source;
+    public boolean isReliable;
     
     // 用于去重的序列号
-    private long sequenceNumber;
+    public long sequenceNumber;
     
     public BgData() {
         this.timestamp = System.currentTimeMillis();
