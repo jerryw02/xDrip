@@ -83,8 +83,11 @@ public class BgDataService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        logger = AIDLLogger.getInstance();
+
+        // 设置实例
+        instance = this;
         
+        logger = AIDLLogger.getInstance();        
         logger.logServiceStatus("BgDataService", "创建");
         logger.step("初始化", "开始");
         
@@ -220,10 +223,14 @@ public IBinder onBind(Intent intent) {
     
     @Override
     public void onDestroy() {
+
+        // 清理1：清除静态引用，防止内存泄漏
+        instance = null;  // ✅ 必须做，让GC可以回收这个服务实例
+        
         logger.logServiceStatus("BgDataService", "销毁");
         
-        // 清理回调列表
-        callbacks.kill();
+        // 清理2：释放客户端回调资源
+        callbacks.kill(); // ✅ 必须做，清理RemoteCallbackList内部资源
         
         super.onDestroy();
     }
@@ -355,7 +362,7 @@ public IBinder onBind(Intent intent) {
     /**
      * 获取服务实例（静态方法）
      */
-    private static BgDataService instance;
+    private static volatile BgDataService instance;
     
     public static BgDataService getInstance() {
         return instance;
