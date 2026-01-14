@@ -79,7 +79,7 @@ public class SendXdripBroadcast {
             // 创建BgData对象
             BgData bgData = new BgData();
             bgData.timestamp = timestamp;
-            bgData.glucose = glucose;
+            bgData.glucoseValue = glucose;
             //bgData.direction = direction != null ? direction : "";
             //bgData.noise = noise;
             bgData.source = "xDrip";
