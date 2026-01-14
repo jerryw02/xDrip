@@ -6,7 +6,7 @@ import android.os.Parcelable;
 public class BgData implements Parcelable {
     public double glucoseValue;
     public long timestamp;
-    public String trend;
+    public int trend;
     public double delta;
     public String source;
     public boolean isReliable;
