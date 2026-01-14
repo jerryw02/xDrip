@@ -93,8 +93,8 @@ public class SendXdripBroadcast {
             // 提取血糖数据的正确方法
             double glucose = extractGlucoseValue(intent, bundle);
             long timestamp = extractTimestampValue(intent, bundle);
-            String direction = extractDirectionValue(intent, bundle);
-            double noise = extractNoiseValue(intent, bundle);
+            //String direction = extractDirectionValue(intent, bundle);
+            //double noise = extractNoiseValue(intent, bundle);
 
             // 验证提取的数据
             if (glucose == 0.0) {
