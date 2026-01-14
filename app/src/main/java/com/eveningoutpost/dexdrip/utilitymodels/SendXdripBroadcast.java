@@ -84,7 +84,7 @@ public class SendXdripBroadcast {
             //bgData.noise = noise;
             bgData.source = "xDrip";
             
-            // 通过ServiceHelper注入数据到AIDL服务
+            // 注入数据到AIDL服务
             injectToService(bgData);
             
             UserError.Log.uel(TAG, "✅ AIDL数据注入成功: " + glucose + " at " + timestamp);
@@ -95,7 +95,7 @@ public class SendXdripBroadcast {
     }
     
     /**
-     * 通过ServiceHelper注入数据
+     * 注入数据
      * 这里使用静态方法调用，让xdrip.java管理服务绑定
      */
     private static void injectToService(BgData bgData) {
