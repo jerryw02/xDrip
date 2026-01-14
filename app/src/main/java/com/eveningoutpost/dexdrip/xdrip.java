@@ -135,7 +135,7 @@ public class xdrip extends Application {
         BgGraphBuilder.setLogging();
 
         // 初始化AIDL服务
-        AIDLServiceHelper.initialize(this);
+        ServiceHelper.initialize(this);
         
     }
 
