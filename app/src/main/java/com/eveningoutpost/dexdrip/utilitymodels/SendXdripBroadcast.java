@@ -314,7 +314,7 @@ public class SendXdripBroadcast {
                 if (service != null) {
                     // 服务存在，注入数据
                     service.injectBgData(bgData);
-                    UserError.Log.d(TAG, "✅ AIDL数据注入成功: " + bgData.getGlucose() + " at " + bgData.getTimestamp());
+                    UserError.Log.d(TAG, "✅ AIDL数据注入成功: " + bgData.getGlucoseValue() + " at " + bgData.getTimestamp());
                     return; // 成功，退出
                 } else {
                     // 服务不存在
