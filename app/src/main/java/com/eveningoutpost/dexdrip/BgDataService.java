@@ -104,7 +104,8 @@ public class BgDataService extends Service {
         }
     }
     
-    @Override
+/*
+@Override
 public IBinder onBind(Intent intent) {
     logger.step("服务绑定", "开始 - 智能判断");
     
@@ -214,7 +215,90 @@ public IBinder onBind(Intent intent) {
         return binder;
     }
 }
+*/
+//////////
+    @Override
+public IBinder onBind(Intent intent) {
+    logger.step("服务绑定", "开始 - 智能判断");
+
+    // 【新增】快速路径1：如果包名非本应用，则强制为外部调用
+    if (intent != null && intent.getPackage() != null && !intent.getPackage().equals(getPackageName())) {
+        logger.success("✅ 包名非本应用，强制外部调用，返回AIDL Binder");
+        return binder;
+    }
+
+    // 【新增】快速路径2：如果Intent包含特定标识，则强制为外部调用
+    if (intent != null && intent.hasExtra("force_external")) {
+        logger.success("✅ 强制外部调用，返回AIDL Binder");
+        return binder;
+    }
+
+    if (intent == null) {
+        logger.warn("绑定请求intent为null，返回AIDL binder");
+        return binder;
+    }
+
+    String action = intent.getAction();
+    String packageName = intent.getPackage();
+    ComponentName component = intent.getComponent();
+
+    logger.debug("=== 绑定请求详细分析 ===");
+    logger.debug("Action: " + action);
+    logger.debug("Package: " + packageName);
+    logger.debug("Component: " + (component != null ? component.getClassName() : "null"));
+    logger.debug("Extras: " + (intent.getExtras() != null ? 
+               intent.getExtras().toString() : "none"));
+
+    String currentPackageName = getPackageName();
+    logger.debug("当前应用包名: " + currentPackageName);
+
+    boolean isInternalCall = false;
+
+    // 方法1：通过包名判断（已通过快速路径处理）
     
+    // 方法2：通过Component判断
+    if (!isInternalCall && component != null) {
+        String componentPackage = component.getPackageName();
+        if (componentPackage != null && componentPackage.equals(currentPackageName)) {
+            isInternalCall = true;
+            logger.debug("✅ 通过Component包名判断为内部调用");
+        }
+    }
+
+    // 方法3：通过Action判断（增强版）
+    if (action != null) {
+        if ("local".equals(action) || "internal".equals(action) || "xdrip.internal".equals(action)) {
+            isInternalCall = true;
+            logger.debug("✅ 通过Action判断为内部调用: " + action);
+        } else if ("aidl".equals(action) || "external".equals(action) || "aaps".equals(action)) {
+            isInternalCall = false;
+            logger.debug("✅ 通过Action判断为外部调用: " + action);
+        } else {
+            isInternalCall = false; // 默认视为外部调用（安全策略）
+            logger.warn("⚠️ Action未知，默认视为外部调用: " + action);
+        }
+    }
+
+    // 方法5：通过Extra判断
+    if (intent.getExtras() != null) {
+        Bundle extras = intent.getExtras();
+        if (extras.containsKey("internal_call") || 
+            extras.containsKey("caller") && extras.getString("caller", "").contains("xdrip")) {
+            isInternalCall = true;
+            logger.debug("✅ 通过Extra判断为内部调用");
+        }
+    }
+
+    // 最终决定返回哪种Binder
+    if (isInternalCall) {
+        logger.success("✅ 判断为内部调用，返回LocalBinder");
+        return localBinder;
+    } else {
+        logger.success("✅ 判断为外部调用，返回AIDL Binder");
+        return binder;
+    }
+}
+//////////    
     @Override
     public boolean onUnbind(Intent intent) {
         logger.debug("所有客户端解除绑定");
