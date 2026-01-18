@@ -900,6 +900,7 @@
         -->
         <service
             android:name=".BgDataService"
+            android:process=":remote"
             android:exported="true"
             android:enabled="true"
             android:foregroundServiceType="health">
