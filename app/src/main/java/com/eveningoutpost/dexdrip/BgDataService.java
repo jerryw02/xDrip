@@ -71,7 +71,7 @@ public class BgDataService extends Service {
         }
     };
     
-    /*
+    
     // LocalBinder用于内部绑定
     public class LocalBinder extends Binder {
         public BgDataService getService() {
@@ -79,7 +79,7 @@ public class BgDataService extends Service {
         }
     }
     private final IBinder localBinder = new LocalBinder();
-    */
+    
     
     @Override
     public void onCreate() {
@@ -217,7 +217,7 @@ public IBinder onBind(Intent intent) {
     }
 }
 */
-/*/////////
+//////////
     @Override
 public IBinder onBind(Intent intent) {
     logger.step("服务绑定", "开始 - 智能判断");
@@ -299,27 +299,8 @@ public IBinder onBind(Intent intent) {
         return binder;
     }
 }
-/////////*/ 
+////////// 
 
-///////////
-    @Override
-public IBinder onBind(Intent intent) {
-    logger.step("服务绑定", "AIDL服务绑定 - 统一返回AIDL接口");
-
-    if (intent == null) {
-        logger.warn("绑定请求intent为null，但仍返回AIDL binder以维持连接");
-        return binder; // 即使intent为空，也返回AIDL
-    }
-
-    // 无需复杂的判断逻辑，直接返回AIDL Stub
-    // 如果你想保留一点“安全阀”，可以打印一下调用方信息
-    String packageName = intent.getPackage();
-    String action = intent.getAction();
-    logger.debug("外部绑定请求 - 包名: " + packageName + ", Action: " + action);
-
-    return binder; 
-}
-///////////
     @Override
     public boolean onUnbind(Intent intent) {
         logger.debug("所有客户端解除绑定");
