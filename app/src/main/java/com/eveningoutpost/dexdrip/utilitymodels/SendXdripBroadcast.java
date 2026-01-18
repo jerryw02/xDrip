@@ -314,18 +314,18 @@ public class SendXdripBroadcast {
                 if (service != null) {
                     // 服务存在，注入数据
                     service.injectBgData(bgData);
-                    UserError.Log.d(TAG, "✅ AIDL数据注入成功: " + bgData.getGlucoseValue() + " at " + bgData.getTimestamp());
+                    UserError.Log.uel(TAG, "✅ AIDL数据注入成功: " + bgData.getGlucoseValue() + " at " + bgData.getTimestamp());
                     return; // 成功，退出
                 } else {
                     // 服务不存在
                     if (retry == 0) {
-                        UserError.Log.w(TAG, "⚠️ AIDL服务未就绪，尝试启动服务...");
+                        UserError.Log.uel(TAG, "⚠️ AIDL服务未就绪，尝试启动服务...");
                         startBgDataService();
                         
                         // 等待服务启动
                         Thread.sleep(300);
                     } else {
-                        UserError.Log.w(TAG, "⚠️ AIDL服务未就绪，数据暂存 (重试 " + retry + "/" + MAX_RETRY + ")");
+                        UserError.Log.uel(TAG, "⚠️ AIDL服务未就绪，数据暂存 (重试 " + retry + "/" + MAX_RETRY + ")");
                         
                         // 只在第一次重试时等待，后续快速失败
                         if (retry < MAX_RETRY) {
@@ -334,7 +334,7 @@ public class SendXdripBroadcast {
                     }
                 }
             } catch (Exception e) {
-                UserError.Log.e(TAG, "注入服务异常 (重试 " + retry + "): " + e.getMessage());
+                UserError.Log.uel(TAG, "注入服务异常 (重试 " + retry + "): " + e.getMessage());
                 if (retry < MAX_RETRY) {
                     try {
                         Thread.sleep(100);
@@ -355,7 +355,7 @@ public class SendXdripBroadcast {
             
             // 先检查服务是否已经在运行
             if (isServiceRunning(context, BgDataService.class)) {
-                UserError.Log.i(TAG, "服务已经在运行，无需重复启动");
+                UserError.Log.uel(TAG, "服务已经在运行，无需重复启动");
                 return;
             }
             
@@ -368,7 +368,7 @@ public class SendXdripBroadcast {
             serviceIntent.putExtra("caller", "SendXdripBroadcast");
             serviceIntent.putExtra("timestamp", System.currentTimeMillis());
             
-            UserError.Log.i(TAG, "正在启动BgDataService...");
+            UserError.Log.uel(TAG, "正在启动BgDataService...");
             
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent);
@@ -376,10 +376,10 @@ public class SendXdripBroadcast {
                 context.startService(serviceIntent);
             }
             
-            UserError.Log.i(TAG, "BgDataService启动请求已发送");
+            UserError.Log.uel(TAG, "BgDataService启动请求已发送");
             
         } catch (Exception e) {
-            UserError.Log.e(TAG, "启动服务失败: " + e.getMessage());
+            UserError.Log.uel(TAG, "启动服务失败: " + e.getMessage());
         }
     }
     
@@ -398,7 +398,7 @@ public class SendXdripBroadcast {
                 }
             }
         } catch (Exception e) {
-            UserError.Log.e(TAG, "检查服务运行状态失败: " + e.getMessage());
+            UserError.Log.uel(TAG, "检查服务运行状态失败: " + e.getMessage());
         }
         return false;
     }
