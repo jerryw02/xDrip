@@ -15,6 +15,7 @@ import android.os.IBinder;
 import android.preference.PreferenceManager;
 import androidx.annotation.StringRes;
 import android.util.Log;
+import com.eveningoutpost.dexdrip.models.UserError;
 
 import com.eveningoutpost.dexdrip.models.AlertType;
 import com.eveningoutpost.dexdrip.models.JoH;
