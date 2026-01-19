@@ -67,23 +67,17 @@ public class BgDataService extends Service {
                 logger.debug(String.format("AAPS回调注销，剩余客户端数: %d", count));
             }
         }
-
-        /*
-        // === 修改：添加服务测试方法 ===
-        @Override
-        public String testConnection() throws RemoteException {
-            logger.debug("收到连接测试请求");
-            return "xDrip AIDL Service is working! Clients: " + 
-                   callbacks.getRegisteredCallbackCount();
-        }
-        */
+        
     };
     
     @Override
     public void onCreate() {
         super.onCreate();
-        // 设置实例
+        UserError.Log.uel(TAG, "=== BgDataService.onCreate() 被调用 ===");
+        
+        // === 关键：设置实例 ===
         instance = this;
+        UserError.Log.uel(TAG, "✅ 实例已设置: " + (instance != null));
         
         logger = AIDLLogger.getInstance();        
         logger.logServiceStatus("BgDataService", "创建");
@@ -93,10 +87,24 @@ public class BgDataService extends Service {
             // 创建前台服务通知
             createNotificationChannel();
             startForeground(NOTIFICATION_ID, createNotification());
-            logger.success("BgDataService启动成功");                        
+            logger.success("BgDataService启动成功");     
+            logger.step("初始化", "完成");
+            
+            // === 新增：发送服务就绪广播 ===
+            sendServiceReadyBroadcast();
+            
         } catch (Exception e) {
             logger.error("BgDataService启动失败: " + e.getMessage());
+            instance = null; // 启动失败时清除实例
         }
+    }
+
+    // 发送服务就绪广播
+    private void sendServiceReadyBroadcast() {
+        Intent intent = new Intent("com.eveningoutpost.dexdrip.AIDL_SERVICE_READY");
+        intent.putExtra("timestamp", System.currentTimeMillis());
+        sendBroadcast(intent);
+        UserError.Log.uel(TAG, "✅ 服务就绪广播已发送");
     }
  
 //////////    
@@ -279,12 +287,47 @@ public class BgDataService extends Service {
     /**
      * 获取服务实例（静态方法）
      */
+    // === 关键修改：确保实例被正确设置 ===
     private static volatile BgDataService instance;
     
+    // 双重检查锁定获取实例
     public static BgDataService getInstance() {
-        return instance;  // 必须在onCreate中设置instance = this
+        if (instance == null) {
+            UserError.Log.uel(TAG, "⚠️ getInstance() 返回 null，服务可能未启动");
+            
+            // 尝试通过其他方式获取服务
+            try {
+                // 检查服务是否在运行
+                Context context = xdrip.getAppContext();
+                if (context != null && isServiceRunning(context, BgDataService.class)) {
+                    UserError.Log.uel(TAG, "服务在运行但实例为null，尝试启动绑定");
+                    
+                    // 发送广播通知需要启动服务
+                    Intent intent = new Intent("com.eveningoutpost.dexdrip.START_SERVICE");
+                    context.sendBroadcast(intent);
+                }
+            } catch (Exception e) {
+                UserError.Log.uel(TAG, "获取实例失败: " + e.getMessage());
+            }
+        }
+        return instance;
     }
-    
+
+    // 检查服务是否在运行
+    private static boolean isServiceRunning(Context context, Class<?> serviceClass) {
+        try {
+            ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+                if (serviceClass.getName().equals(service.service.getClassName())) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            UserError.Log.uel(TAG, "检查服务运行状态失败: " + e.getMessage());
+        }
+        return false;
+    }
+        
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         logger.logServiceStatus("BgDataService", "任务移除，重新启动");
