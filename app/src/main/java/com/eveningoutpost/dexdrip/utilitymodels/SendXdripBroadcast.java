@@ -7,6 +7,7 @@ import android.os.Bundle;
 import com.eveningoutpost.dexdrip.models.UserError;
 import com.eveningoutpost.dexdrip.BgData;
 import com.eveningoutpost.dexdrip.BgDataService;
+import com.eveningoutpost.dexdrip.xdrip;
 import android.os.RemoteException;
 
 import static com.eveningoutpost.dexdrip.xdrip.getAppContext;
