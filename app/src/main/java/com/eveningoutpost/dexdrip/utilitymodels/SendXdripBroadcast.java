@@ -330,28 +330,30 @@ public class SendXdripBroadcast {
                     } catch (Exception e) {
                         UserError.Log.uel(TAG, "❌ injectBgData 调用异常: " + e.getMessage());
                         e.printStackTrace();
-                    }    
-                }
-                /*    
+                    } 
+                                
                 } else {
                     // 服务不存在
-                    if (retry == 0) {
-                        UserError.Log.uel(TAG, "⚠️ AIDL服务未就绪，尝试启动服务...");
-                        startBgDataService();
-                        
-                        // 等待服务启动
-                        Thread.sleep(300);
-                    } else {
-                        UserError.Log.uel(TAG, "⚠️ AIDL服务未就绪，数据暂存 (重试 " + retry + "/" + MAX_RETRY + ")");
-                        
-                        // 只在第一次重试时等待，后续快速失败
-                        if (retry < MAX_RETRY) {
-                            Thread.sleep(100);
+                    UserError.Log.uel(TAG, "⚠️ 服务不可用，数据暂存");
+            
+                    // 将数据加入暂存队列
+                    synchronized (pendingDataQueue) {
+                        pendingDataQueue.offer(bgData);
+                        // 限制队列大小，防止内存泄漏
+                        if (pendingDataQueue.size() > 10) {
+                            pendingDataQueue.poll(); // 移除最旧的数据
+                            UserError.Log.uel(TAG, "⚠️ 队列已满，移除最旧数据");
                         }
                     }
+            
+                    UserError.Log.uel(TAG, "当前暂存数据量: " + pendingDataQueue.size());
+            
+                    // 尝试启动服务
+                    startBgDataService();
+            
+                    return; // 不继续尝试注入
                 }
-                */
-
+                
                 ////////
                 // 方法2：通过应用实例获取
                 UserError.Log.uel(TAG, "尝试方法2：通过xdrip应用实例获取");
@@ -615,4 +617,92 @@ private static void startAndBindServiceDirectly(BgData bgData) {
 
     // 添加状态跟踪变量
     private static String lastInjectionStatus = "从未尝试";
+
+////////
+    // === 新增：服务状态广播接收器 ===
+    private static final BroadcastReceiver serviceStatusReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            UserError.Log.uel(TAG, "收到广播: " + action);
+            
+            if ("com.eveningoutpost.dexdrip.AIDL_SERVICE_READY".equals(action)) {
+                long timestamp = intent.getLongExtra("timestamp", 0);
+                int pid = intent.getIntExtra("service_pid", 0);
+                
+                UserError.Log.uel(TAG, "🎉 AIDL服务就绪！");
+                UserError.Log.uel(TAG, "  时间戳: " + timestamp);
+                UserError.Log.uel(TAG, "  服务PID: " + pid);
+                
+                // 立即检查服务实例是否可用
+                BgDataService service = BgDataService.getInstance();
+                UserError.Log.uel(TAG, "  服务实例: " + (service != null ? "可用" : "不可用"));
+                
+                // 如果有暂存数据，现在可以处理
+                processPendingData();
+            }
+        }
+    };
+    
+    // === 新增：数据暂存队列 ===
+    private static final Queue<BgData> pendingDataQueue = new LinkedList<>();
+    
+    /**
+     * 处理暂存的数据
+     */
+    private static synchronized void processPendingData() {
+        if (pendingDataQueue.isEmpty()) {
+            UserError.Log.uel(TAG, "没有暂存数据需要处理");
+            return;
+        }
+        
+        UserError.Log.uel(TAG, "开始处理 " + pendingDataQueue.size() + " 条暂存数据");
+        
+        while (!pendingDataQueue.isEmpty()) {
+            BgData data = pendingDataQueue.poll();
+            try {
+                injectToService(data);
+                UserError.Log.uel(TAG, "✅ 暂存数据处理成功: " + data.getGlucoseValue());
+            } catch (Exception e) {
+                UserError.Log.uel(TAG, "❌ 暂存数据处理失败: " + e.getMessage());
+                // 可以重新加入队列或记录错误
+            }
+        }
+    }
+////////
+    // === 静态初始化块：注册广播接收器 ===
+    static {
+        try {
+            Context context = getAppContext();
+            if (context != null) {
+                IntentFilter filter = new IntentFilter();
+                filter.addAction("com.eveningoutpost.dexdrip.AIDL_SERVICE_READY");
+                filter.addAction("com.eveningoutpost.dexdrip.SERVICE_STATUS");
+                
+                // 动态注册接收器
+                context.registerReceiver(serviceStatusReceiver, filter);
+                
+                UserError.Log.uel(TAG, "服务状态广播接收器已注册");
+            }
+        } catch (Exception e) {
+            UserError.Log.uel(TAG, "注册广播接收器失败: " + e.getMessage());
+        }
+    }
+    
+    // === 新增：清理方法 ===
+    public static void cleanup() {
+        try {
+            Context context = getAppContext();
+            if (context != null) {
+                context.unregisterReceiver(serviceStatusReceiver);
+                UserError.Log.uel(TAG, "广播接收器已注销");
+            }
+        } catch (Exception e) {
+            // 忽略异常，接收器可能未注册
+        }
+        
+        // 清空暂存队列
+        pendingDataQueue.clear();
+    }
+    
 }
