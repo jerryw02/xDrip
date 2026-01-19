@@ -898,13 +898,14 @@
             必须 exported="true"，允许其他应用绑定
             且需定义 intent-filter
         -->
+        <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
         <service
             android:name=".BgDataService"
             android:process=":remote"
             android:exported="true"
             android:enabled="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:foregroundServiceType="health">
+            android:foregroundServiceType="dataSync">
 
             <intent-filter>
                 <action android:name="com.eveningoutpost.dexdrip.BgDataService" />
