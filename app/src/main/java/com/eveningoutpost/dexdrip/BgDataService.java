@@ -10,6 +10,7 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
+import com.eveningoutpost.dexdrip.models.UserError;
 
 // === 修改：删除不必要的import ===
 // import android.content.ComponentName;
