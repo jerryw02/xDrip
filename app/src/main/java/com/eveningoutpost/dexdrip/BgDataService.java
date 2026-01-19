@@ -71,16 +71,6 @@ public class BgDataService extends Service {
         }
     };
     
-    
-    // LocalBinder用于内部绑定
-    public class LocalBinder extends Binder {
-        public BgDataService getService() {
-            return BgDataService.this;
-        }
-    }
-    private final IBinder localBinder = new LocalBinder();
-    
-    
     @Override
     public void onCreate() {
         super.onCreate();
