@@ -73,6 +73,11 @@ public class BgDataService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+
+        UserError.Log.uel(TAG, "Thread: " + Thread.currentThread().getName());
+        UserError.Log.uel(TAG, "Process: " + android.os.Process.myPid());
+        UserError.Log.uel(TAG, "Application: " + getApplication());
+        
         UserError.Log.uel(TAG, "=== BgDataService.onCreate() 被调用 ===");
         
         // === 关键：设置实例 ===
