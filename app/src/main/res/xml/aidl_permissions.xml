@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<permissions>
+    <!-- 定义自定义权限 -->
+    <permission
+        android:name="com.eveningoutpost.dexdrip.permission.BIND_BG_DATA_SERVICE"
+        android:description="允许绑定到xDrip血糖数据服务"
+        android:label="xDrip数据服务权限"
+        android:protectionLevel="signature" /> <!-- signature级别最安全 -->
+</permissions>
