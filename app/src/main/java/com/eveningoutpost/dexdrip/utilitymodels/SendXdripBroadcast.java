@@ -309,18 +309,25 @@ public class SendXdripBroadcast {
         
         for (int retry = 0; retry <= MAX_RETRY; retry++) {
             try {
+
+                UserError.Log.uel(TAG, "=== 开始注入数据到AIDL服务 ===");
+                UserError.Log.uel(TAG, "数据: " + bgData.getGlucoseValue() + " @ " + bgData.getTimestamp());
                 // 尝试获取服务实例
                 BgDataService service = BgDataService.getInstance();
+                UserError.Log.uel(TAG, "getInstance() 结果: " + (service != null ? "非空" : "NULL"));
                 
                 if (service != null) {
+                    UserError.Log.uel(TAG, "服务类: " + service.getClass().getName());
+                    UserError.Log.uel(TAG, "调用 injectBgData()...");
                     // 服务存在，注入数据
-                    // ✅ 检查服务是否真的可用（新增）
-                    if (isServiceAvailable(service)) {
+                    try {
                         service.injectBgData(bgData);
+                        UserError.Log.uel(TAG, "✅ injectBgData 调用成功");
                         UserError.Log.uel(TAG, "✅ AIDL数据注入成功: " + bgData.getGlucoseValue() + " at " + bgData.getTimestamp());
                         return; // 成功，退出
-                    } else {
-                    UserError.Log.uel(TAG, "⚠️ 服务实例存在但可能未就绪");
+                    } catch (Exception e) {
+                        UserError.Log.uel(TAG, "❌ injectBgData 调用异常: " + e.getMessage());
+                        e.printStackTrace();
                     }    
                 } else {
                     // 服务不存在
