@@ -6,9 +6,12 @@ import android.os.Bundle;
 
 // === 新增：添加缺失的 import ===
 import android.content.BroadcastReceiver;      // 添加这个
+
 import android.content.IntentFilter;           // 添加这个
+import android.content.ServiceConnection;  // 新增
 import android.content.ComponentName;          // 可能需要
 import android.os.Handler;                     // 可能需要
+import android.os.IBinder;                // 新增
 import android.os.Looper;                      // 可能需要
 
 import com.eveningoutpost.dexdrip.models.UserError;
