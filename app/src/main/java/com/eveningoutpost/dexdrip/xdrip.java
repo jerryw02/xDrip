@@ -12,6 +12,9 @@ import android.content.ServiceConnection;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.Handler;      // 添加这个
+import android.os.Looper;       // 添加这个
+
 import android.preference.PreferenceManager;
 import androidx.annotation.StringRes;
 import android.util.Log;
