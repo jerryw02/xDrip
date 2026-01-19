@@ -903,6 +903,7 @@
             android:process=":remote"
             android:exported="true"
             android:enabled="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:foregroundServiceType="health">
 
             <intent-filter>
