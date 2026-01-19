@@ -1,10 +1,10 @@
-package com.eveningoutpost.dexdrip;  // 保持包名不变
+package com.eveningoutpost.dexdrip;
 
 import android.os.Parcel;
 import android.os.Parcelable;
 
 public class BgData implements Parcelable {
-    // 字段名称和类型必须与 AAPS 完全一致
+    // 字段必须与 AAPS 完全一致
     public long timestamp;
     public double glucose;
     public double glucoseMmol;
@@ -26,6 +26,8 @@ public class BgData implements Parcelable {
         this.noise = "";
         this.direction = "Flat";
         this.rawData = "";
+        this.sensorBatteryLevel = 0;
+        this.transmitterBatteryLevel = 0;
     }
     
     // 便捷构造函数（兼容现有代码）
@@ -44,7 +46,7 @@ public class BgData implements Parcelable {
     
     // 趋势值转换
     private String convertTrendToString(int trend) {
-        // xDrip 使用的趋势值映射
+        // xDrip 趋势值映射
         // 0=无趋势, 1=45度上升, 2=单箭头上升, 3=双箭头上升
         // 4=45度下降, 5=单箭头下降, 6=双箭头下降
         switch(trend) {
@@ -111,11 +113,12 @@ public class BgData implements Parcelable {
         }
     };
     
-    // Getter 方法（可选，但建议添加）
+    // Getter 方法
     public double getGlucose() { return glucose; }
     public long getTimestamp() { return timestamp; }
     public String getDirection() { return direction; }
     public String getSource() { return source; }
+    public String getRawData() { return rawData; }
     
     // 为了兼容原有调用，可以添加这些方法
     public double getGlucoseValue() { return glucose; }
@@ -128,67 +131,13 @@ public class BgData implements Parcelable {
         }
     }
     
+    public double getDelta() { return 0.0; } // 兼容方法，AAPS 不需要 delta
+    
+    public boolean isReliable() { return true; } // 兼容方法
+    
     @Override
     public String toString() {
         return String.format("BgData{glucose=%.1f, time=%d, direction=%s, source=%s}", 
             glucose, timestamp, direction, source);
-    }
-}        sequenceNumber = in.readLong();
-    }
-    
-    @Override
-    public void writeToParcel(Parcel dest, int flags) {
-        dest.writeDouble(glucoseValue);
-        dest.writeLong(timestamp);
-        dest.writeInt(trend);
-        dest.writeDouble(delta);
-        dest.writeString(source);
-        dest.writeByte((byte) (isReliable ? 1 : 0));
-        dest.writeLong(sequenceNumber);
-    }
-    
-    @Override
-    public int describeContents() {
-        return 0;
-    }
-    
-    public static final Creator<BgData> CREATOR = new Creator<BgData>() {
-        @Override
-        public BgData createFromParcel(Parcel in) {
-            return new BgData(in);
-        }
-        
-        @Override
-        public BgData[] newArray(int size) {
-            return new BgData[size];
-        }
-    };
-    
-    // Getters and Setters
-    public double getGlucoseValue() { return glucoseValue; }
-    public void setGlucoseValue(double glucoseValue) { this.glucoseValue = glucoseValue; }
-    
-    public long getTimestamp() { return timestamp; }
-    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
-    
-    public int getTrend() { return trend; }
-    public void setTrend(int trend) { this.trend = trend; }
-    
-    public double getDelta() { return delta; }
-    public void setDelta(double delta) { this.delta = delta; }
-    
-    public String getSource() { return source; }
-    public void setSource(String source) { this.source = source; }
-    
-    public boolean isReliable() { return isReliable; }
-    public void setReliable(boolean reliable) { isReliable = reliable; }
-    
-    public long getSequenceNumber() { return sequenceNumber; }
-    public void setSequenceNumber(long sequenceNumber) { this.sequenceNumber = sequenceNumber; }
-    
-    @Override
-    public String toString() {
-        return String.format("BgData{glucose=%.1f, time=%d, trend=%d, seq=%d}", 
-            glucoseValue, timestamp, trend, sequenceNumber);
     }
 }
