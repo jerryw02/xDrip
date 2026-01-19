@@ -11,14 +11,12 @@ import android.os.IBinder;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 
-// 在 BgDataService.java 文件开头的import部分添加：
-import android.content.ComponentName;
-import android.os.Bundle;
+// === 修改：删除不必要的import ===
+// import android.content.ComponentName;
+// import android.os.Bundle;
 
 import androidx.core.app.NotificationCompat;
-
 import com.eveningoutpost.dexdrip.utils.AIDLLogger;
-
 import java.util.concurrent.atomic.AtomicLong;
 
 public class BgDataService extends Service {
@@ -69,12 +67,20 @@ public class BgDataService extends Service {
                 logger.debug(String.format("AAPS回调注销，剩余客户端数: %d", count));
             }
         }
+
+        // === 修改：添加服务测试方法 ===
+        @Override
+        public String testConnection() throws RemoteException {
+            logger.debug("收到连接测试请求");
+            return "xDrip AIDL Service is working! Clients: " + 
+                   callbacks.getRegisteredCallbackCount();
+        }
+        
     };
     
     @Override
     public void onCreate() {
         super.onCreate();
-
         // 设置实例
         instance = this;
         
@@ -86,97 +92,45 @@ public class BgDataService extends Service {
             // 创建前台服务通知
             createNotificationChannel();
             startForeground(NOTIFICATION_ID, createNotification());
-            
-            logger.success("BgDataService启动成功");
-            logger.step("初始化", "完成");
-            
+            logger.success("BgDataService启动成功");                        
         } catch (Exception e) {
             logger.error("BgDataService启动失败: " + e.getMessage());
         }
     }
  
-//////////
+//////////    
+    // === 修改：简化onBind方法（关键修改）===
     @Override
-public IBinder onBind(Intent intent) {
-    logger.step("服务绑定", "开始 - 智能判断");
-
-    // 【新增】快速路径1：如果包名非本应用，则强制为外部调用
-    if (intent != null && intent.getPackage() != null && !intent.getPackage().equals(getPackageName())) {
-        logger.success("✅ 包名非本应用，强制外部调用，返回AIDL Binder");
-        return binder;
-    }
-
-    // 【新增】快速路径2：如果Intent包含特定标识，则强制为外部调用
-    if (intent != null && intent.hasExtra("force_external")) {
-        logger.success("✅ 强制外部调用，返回AIDL Binder");
-        return binder;
-    }
-
-    if (intent == null) {
-        logger.warn("绑定请求intent为null，返回AIDL binder");
-        return binder;
-    }
-
-    String action = intent.getAction();
-    String packageName = intent.getPackage();
-    ComponentName component = intent.getComponent();
-
-    logger.debug("=== 绑定请求详细分析 ===");
-    logger.debug("Action: " + action);
-    logger.debug("Package: " + packageName);
-    logger.debug("Component: " + (component != null ? component.getClassName() : "null"));
-    logger.debug("Extras: " + (intent.getExtras() != null ? 
-               intent.getExtras().toString() : "none"));
-
-    String currentPackageName = getPackageName();
-    logger.debug("当前应用包名: " + currentPackageName);
-
-    boolean isInternalCall = false;
-
-    // 方法1：通过包名判断（已通过快速路径处理）
-    
-    // 方法2：通过Component判断
-    if (!isInternalCall && component != null) {
-        String componentPackage = component.getPackageName();
-        if (componentPackage != null && componentPackage.equals(currentPackageName)) {
-            isInternalCall = true;
-            logger.debug("✅ 通过Component包名判断为内部调用");
+    public IBinder onBind(Intent intent) {
+        logger.step("服务绑定", "开始");
+        
+        // 记录调用者信息
+        int callingUid = Binder.getCallingUid();
+        try {
+            String[] packages = getPackageManager().getPackagesForUid(callingUid);
+            if (packages != null && packages.length > 0) {
+                String callingPackage = packages[0];
+                logger.debug("调用者包名: " + callingPackage);
+                logger.debug("调用者UID: " + callingUid);
+                
+                // 区分调用者用于日志，但不影响返回的Binder
+                if (callingPackage.equals(getPackageName())) {
+                    logger.debug("调用者: xdrip自身");
+                } else {
+                    logger.debug("调用者: 外部应用 - " + callingPackage);
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("获取调用者信息失败: " + e.getMessage());
         }
-    }
-
-    // 方法3：通过Action判断（增强版）
-    if (action != null) {
-        if ("local".equals(action) || "internal".equals(action) || "xdrip.internal".equals(action)) {
-            isInternalCall = true;
-            logger.debug("✅ 通过Action判断为内部调用: " + action);
-        } else if ("aidl".equals(action) || "external".equals(action) || "aaps".equals(action)) {
-            isInternalCall = false;
-            logger.debug("✅ 通过Action判断为外部调用: " + action);
-        } else {
-            isInternalCall = false; // 默认视为外部调用（安全策略）
-            logger.warn("⚠️ Action未知，默认视为外部调用: " + action);
-        }
-    }
-
-    // 方法5：通过Extra判断
-    if (intent.getExtras() != null) {
-        Bundle extras = intent.getExtras();
-        if (extras.containsKey("internal_call") || 
-            extras.containsKey("caller") && extras.getString("caller", "").contains("xdrip")) {
-            isInternalCall = true;
-            logger.debug("✅ 通过Extra判断为内部调用");
-        }
-    }
-
-    // 最终决定返回哪种Binder
-    if (isInternalCall) {
-        logger.success("✅ 判断为内部调用，返回LocalBinder");
-        return localBinder;
-    } else {
-        logger.success("✅ 判断为外部调用，返回AIDL Binder");
+        
+        // === 核心修改：总是返回AIDL Binder ===
+        logger.success("返回AIDL Binder");
+        logger.debug("Binder类型: " + binder.getClass().getName());
+        logger.debug("实现接口: IBgDataService.Stub");
+        
         return binder;
     }
-}
 ////////// 
 
     @Override
@@ -283,10 +237,8 @@ public IBinder onBind(Intent intent) {
             }
         }
         
-        callbacks.finishBroadcast();
-        
-        logger.step("通知完成", "结果", 
-            "成功:" + successCount, "失败:" + failCount);
+        callbacks.finishBroadcast();        
+        logger.step("通知完成", "结果", "成功:" + successCount, "失败:" + failCount);
     }
     
     /**
@@ -341,4 +293,17 @@ public IBinder onBind(Intent intent) {
         startService(restartService);
         super.onTaskRemoved(rootIntent);
     }
+
+    // === 修改：添加简单的测试方法 ===
+    public void sendTestData() {
+        BgData testData = new BgData();
+        testData.setGlucoseValue(120.0);
+        testData.setTimestamp(System.currentTimeMillis());
+        testData.setTrend("→");
+        testData.setSequenceNumber(sequenceGenerator.incrementAndGet());
+        
+        injectBgData(testData);
+        logger.debug("发送测试数据完成");
+    }
+    
 }
