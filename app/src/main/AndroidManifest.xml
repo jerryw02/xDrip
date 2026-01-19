@@ -898,9 +898,11 @@
             必须 exported="true"，允许其他应用绑定
             且需定义 intent-filter
         -->        
+    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
+    <application
+        <!-- BgDataService 声明 -->
         <service
             android:name=".BgDataService"
-            android:process=":remote"
             android:exported="true"
             android:enabled="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -908,7 +910,14 @@
 
             <intent-filter>
                 <action android:name="com.eveningoutpost.dexdrip.BgDataService" />
+                <!-- 可以添加更多 action -->
+                <action android:name="com.eveningoutpost.dexdrip.aidl.BG_DATA_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- 可选：添加 meta-data 帮助系统识别 -->
+            <meta-data
+                android:name="android.service.foreground_service_type"
+                android:value="dataSync" />
 
         </service>
         
