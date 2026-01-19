@@ -658,7 +658,10 @@ private static void startAndBindServiceDirectly(BgData bgData) {
     };
     
     // === 新增：数据暂存队列 ===
-    private static final Queue<BgData> pendingDataQueue = new LinkedList<>();
+    //private static final Queue<BgData> pendingDataQueue = new LinkedList<>();
+    private static final Queue<BgData> pendingDataQueue = new LinkedList<BgData>();
+    // 或
+    //private static final LinkedList<BgData> pendingDataQueue = new LinkedList<>();
     
     /**
      * 处理暂存的数据
