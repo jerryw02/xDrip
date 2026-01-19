@@ -84,7 +84,7 @@ public class BgDataService extends Service {
         
         // === 关键：设置实例 ===
         instance = this;
-        UserError.Log.uel(TAG, "✅ 实例已设置: " + (instance != null));
+        UserError.Log.uel(TAG, "✅ 静态实例已设置: " + (instance != null));
         
         logger = AIDLLogger.getInstance();        
         logger.logServiceStatus("BgDataService", "创建");
