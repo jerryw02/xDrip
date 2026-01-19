@@ -905,7 +905,7 @@
             android:name=".BgDataService"
             android:exported="true"
             android:enabled="true"
-            android:foregroundServiceType="dataSync">
+            android:foregroundServiceType="dataSync"
             <!--android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"-->          
            
             <intent-filter>
