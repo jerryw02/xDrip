@@ -68,6 +68,7 @@ public class BgDataService extends Service {
             }
         }
 
+        /*
         // === 修改：添加服务测试方法 ===
         @Override
         public String testConnection() throws RemoteException {
@@ -75,7 +76,7 @@ public class BgDataService extends Service {
             return "xDrip AIDL Service is working! Clients: " + 
                    callbacks.getRegisteredCallbackCount();
         }
-        
+        */
     };
     
     @Override
@@ -299,7 +300,7 @@ public class BgDataService extends Service {
         BgData testData = new BgData();
         testData.setGlucoseValue(120.0);
         testData.setTimestamp(System.currentTimeMillis());
-        testData.setTrend("→");
+        //testData.setTrend("→");
         testData.setSequenceNumber(sequenceGenerator.incrementAndGet());
         
         injectBgData(testData);
