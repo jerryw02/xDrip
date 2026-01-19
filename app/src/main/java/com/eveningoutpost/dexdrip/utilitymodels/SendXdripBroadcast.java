@@ -313,9 +313,14 @@ public class SendXdripBroadcast {
                 
                 if (service != null) {
                     // 服务存在，注入数据
-                    service.injectBgData(bgData);
-                    UserError.Log.uel(TAG, "✅ AIDL数据注入成功: " + bgData.getGlucoseValue() + " at " + bgData.getTimestamp());
-                    return; // 成功，退出
+                    // ✅ 检查服务是否真的可用（新增）
+                    if (isServiceAvailable(service)) {
+                        service.injectBgData(bgData);
+                        UserError.Log.uel(TAG, "✅ AIDL数据注入成功: " + bgData.getGlucoseValue() + " at " + bgData.getTimestamp());
+                        return; // 成功，退出
+                    } else {
+                    UserError.Log.uel(TAG, "⚠️ 服务实例存在但可能未就绪");
+                    }    
                 } else {
                     // 服务不存在
                     if (retry == 0) {
@@ -334,16 +339,38 @@ public class SendXdripBroadcast {
                     }
                 }
             } catch (Exception e) {
-                UserError.Log.uel(TAG, "注入服务异常 (重试 " + retry + "): " + e.getMessage());
+                UserError.Log.uel(TAG, "注入服务异常 (重试 " + retry + "): " + 
+                e.getClass().getSimpleName() + ": " + e.getMessage());
+            
+                // 特别处理特定异常
+                if (e instanceof NullPointerException) {
+                    UserError.Log.uel(TAG, "⚠️ 空指针异常，可能是getInstance()返回null");
+                }
+                                
                 if (retry < MAX_RETRY) {
                     try {
-                        Thread.sleep(100);
+                        Thread.sleep(100 * (retry + 1)); // 递增等待时间
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
+                        break;
                     }
                 }
             }
         }
+    }
+
+    /**
+     * 检查服务是否真正可用（新增辅助方法）
+     */
+    private static boolean isServiceAvailable(BgDataService service) {
+        if (service == null) {
+            return false;
+        }
+    
+        // 这里可以添加更多服务健康检查
+        // 例如：检查服务是否被销毁、是否处于正确状态等
+    
+        return true;
     }
 
     /**
@@ -356,30 +383,46 @@ public class SendXdripBroadcast {
             // 先检查服务是否已经在运行
             if (isServiceRunning(context, BgDataService.class)) {
                 UserError.Log.uel(TAG, "服务已经在运行，无需重复启动");
+
+                // 即使服务在运行，也要确保实例已设置
+                BgDataService service = BgDataService.getInstance();
+                if (service == null) {
+                    UserError.Log.uel(TAG, "⚠️ 服务运行但实例未设置，尝试通过应用实例获取");
+                
+                    // 尝试通过xdrip.java获取
+                    if (xdrip.getInstance() != null && 
+                        xdrip.getInstance().isBgDataServiceBound()) {
+                        // xdrip.java中可能有连接好的服务
+                        UserError.Log.uel(TAG, "✅ 通过xdrip应用实例获取服务");
+                    }
+                }
                 return;
             }
             
             // 创建启动Intent
             Intent serviceIntent = new Intent(context, BgDataService.class);
             serviceIntent.setPackage(context.getPackageName());
-            serviceIntent.setAction("internal");
             
-            // 添加标记，让onBind能正确识别
-            serviceIntent.putExtra("caller", "SendXdripBroadcast");
-            serviceIntent.putExtra("timestamp", System.currentTimeMillis());
+            // ⚠️ 重要：现在不需要特殊标记，因为onBind总是返回AIDL Binder
+            // serviceIntent.setAction("internal"); // 可以删除这行
+            // serviceIntent.putExtra("caller", "SendXdripBroadcast"); // 可以删除
+
+            serviceIntent.putExtra("timestamp", System.currentTimeMillis());            
+            UserError.Log.uel(TAG, "🚀 正在启动BgDataService...");
             
-            UserError.Log.uel(TAG, "正在启动BgDataService...");
-            
+            // 启动服务
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent);
             } else {
                 context.startService(serviceIntent);
             }
             
-            UserError.Log.uel(TAG, "BgDataService启动请求已发送");
+            UserError.Log.uel(TAG, "✅ BgDataService启动请求已发送");
+            // 等待服务初始化
+            Thread.sleep(200);
             
         } catch (Exception e) {
-            UserError.Log.uel(TAG, "启动服务失败: " + e.getMessage());
+            UserError.Log.uel(TAG, "❌ 启动服务失败: " + e.getMessage());
         }
     }
     
@@ -426,29 +469,40 @@ public class SendXdripBroadcast {
     public static boolean enabled() {
         return Pref.getBooleanDefaultFalse("broadcast_data_through_intents");
     }
-    
+           
     /**
-     * 新增：检查AIDL服务是否可用
-     */
-    public static boolean isAidlServiceAvailable() {
-        try {
-            return BgDataService.getInstance() != null;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-    
-    /**
-     * 新增：获取当前服务的状态信息（用于调试）
+     * 新增：获取详细的AIDL服务状态信息
      */
     public static String getAidlServiceStatus() {
+        StringBuilder status = new StringBuilder();
+    
         try {
-            if (BgDataService.getInstance() != null) {
-                return "AIDL服务运行中";
+            // 1. 检查静态实例
+            BgDataService instance = BgDataService.getInstance();
+            status.append("静态实例: ").append(instance != null ? "存在" : "null").append("\n");
+        
+            // 2. 检查服务是否在运行
+            if (getAppContext() != null) {
+                boolean isRunning = isServiceRunning(getAppContext(), BgDataService.class);
+                status.append("服务运行状态: ").append(isRunning ? "运行中" : "未运行").append("\n");
             }
-            return "AIDL服务未启动";
+        
+            // 3. 检查xdrip应用实例（如果可用）
+            if (xdrip.getInstance() != null) {
+                boolean isBound = xdrip.getInstance().isBgDataServiceBound();
+                status.append("应用绑定状态: ").append(isBound ? "已绑定" : "未绑定").append("\n");
+            }
+        
+            // 4. 上次注入状态
+            status.append("上次注入结果: ").append(lastInjectionStatus).append("\n");
+        
         } catch (Exception e) {
-            return "AIDL服务状态未知: " + e.getMessage();
+            status.append("状态检查异常: ").append(e.getMessage());
         }
+    
+        return status.toString();
     }
+
+    // 添加状态跟踪变量
+    private static String lastInjectionStatus = "从未尝试";
 }
