@@ -324,7 +324,7 @@ public IBinder onBind(Intent intent) {
     /**
      * 核心方法：注入新的血糖数据
      */
-    public void injectBgData(BgData newData) {
+    public void injectBgData(BgData newData) { // ✅ public方法
         if (newData == null) {
             logger.error("注入数据为空");
             return;
@@ -451,7 +451,7 @@ public IBinder onBind(Intent intent) {
     private static volatile BgDataService instance;
     
     public static BgDataService getInstance() {
-        return instance;
+        return instance;  // 必须在onCreate中设置instance = this
     }
     
     @Override
