@@ -501,9 +501,16 @@ private static void startAndBindServiceDirectly(BgData bgData) {
         return true;
     }
 
+////////
+    private static void startBgDataService() {
+        xdrip.startBgDataServiceStatic();
+    }
+////////
+    
     /**
      * 启动BgDataService 
      */
+    /*
     private static void startBgDataService() {
         try {
             Context context = getAppContext();
@@ -553,6 +560,7 @@ private static void startAndBindServiceDirectly(BgData bgData) {
             UserError.Log.uel(TAG, "❌ 启动服务失败: " + e.getMessage());
         }
     }
+    */
     
     /**
      * 检查服务是否正在运行
