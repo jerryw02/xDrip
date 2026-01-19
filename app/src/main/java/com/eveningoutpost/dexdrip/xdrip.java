@@ -91,7 +91,8 @@ public class xdrip extends Application {
         super.onCreate();
         
         // =============== AIDL 服务初始化（新增） ===============
-        initAIDLService();
+        // ✅ 已经有的代码 - 这是正确的
+        initAIDLService();  // 这会调用 startBgDataService()
         // ====================== AIDL 结束 =====================
         
         JodaTimeAndroid.init(this);
@@ -171,11 +172,15 @@ public class xdrip extends Application {
                 aidlLogger.step("AIDL服务", "初始化");
             }
             
+            // === 关键改进：立即启动服务，不等待 ===
+            // 原来可能有的延迟启动逻辑改为立即启动
+        
             // 初始化服务连接
             initBgDataServiceConnection();
             
             // 启动并绑定BgDataService
-            startBgDataService();
+            // ✅ 立即启动并绑定服务（不要延迟）
+            startBgDataServiceImmediately();
             
             if (aidlLogger != null) {
                 aidlLogger.success("AIDL服务初始化完成");
@@ -326,6 +331,68 @@ private void startBgDataService() {
 }
     
 /////////////////
+
+/////////////////
+/**
+ * 立即启动并绑定服务（改进版）
+ */
+private void startBgDataServiceImmediately() {
+    if (aidlLogger != null) {
+        aidlLogger.step("立即启动服务", "开始");
+    }
+    
+    try {
+        // 创建明确的启动Intent
+        Intent serviceIntent = new Intent(this, BgDataService.class);
+        serviceIntent.setPackage(getPackageName());
+        
+        // ⚠️ 关键：添加明确的启动标志
+        serviceIntent.putExtra("startup_priority", "highest");
+        serviceIntent.putExtra("startup_time", System.currentTimeMillis());
+        serviceIntent.putExtra("started_by", "xdrip_onCreate");
+        
+        UserError.Log.uel(TAG, "立即启动BgDataService，优先级：highest");
+        
+        // 1. 先启动服务（确保实例创建）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+        
+        // 2. 立即绑定（确保获得实例引用）
+        int bindFlags = Context.BIND_AUTO_CREATE | 
+                       Context.BIND_IMPORTANT | 
+                       Context.BIND_ABOVE_CLIENT;
+        
+        boolean bound = bindService(serviceIntent, bgServiceConnection, bindFlags);
+        
+        if (bound) {
+            Log.i(TAG, "BgDataService立即绑定成功");
+            if (aidlLogger != null) {
+                aidlLogger.success("BgDataService立即绑定成功");
+            }
+        } else {
+            Log.e(TAG, "BgDataService立即绑定失败");
+            if (aidlLogger != null) {
+                aidlLogger.error("BgDataService立即绑定失败");
+            }
+            
+            // 3. 失败后重试
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                UserError.Log.uel(TAG, "重试绑定BgDataService");
+                bindService(serviceIntent, bgServiceConnection, bindFlags);
+            }, 1000);
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "立即启动服务异常: " + e.getMessage(), e);
+        if (aidlLogger != null) {
+            aidlLogger.error("立即启动服务异常: " + e.getMessage());
+        }
+    }
+}
+/////////////////    
   
     
     /**
@@ -346,15 +413,8 @@ private void startBgDataService() {
                 startBgDataService();
             }
         }, 5000);
-    }
-    
-    /**
-     * 获取BgDataService实例（供BroadcastService使用）
-     */
-    //public BgDataService getBgDataService() {
-    //    return bgDataService;
-    //}
-    
+    } 
+      
     /**
      * 检查BgDataService是否已绑定
      */
