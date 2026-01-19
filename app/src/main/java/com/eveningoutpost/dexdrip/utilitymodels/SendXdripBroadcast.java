@@ -304,6 +304,7 @@ public class SendXdripBroadcast {
      */
     
     private static void injectToService(BgData bgData) {
+        
         // 最大重试次数
         final int MAX_RETRY = 2;
         
@@ -312,9 +313,10 @@ public class SendXdripBroadcast {
 
                 UserError.Log.uel(TAG, "=== 开始注入数据到AIDL服务 ===");
                 UserError.Log.uel(TAG, "数据: " + bgData.getGlucoseValue() + " @ " + bgData.getTimestamp());
-                // 尝试获取服务实例
+                
+                // 方法1：直接通过静态方法获取
                 BgDataService service = BgDataService.getInstance();
-                UserError.Log.uel(TAG, "getInstance() 结果: " + (service != null ? "非空" : "NULL"));
+                UserError.Log.uel(TAG, "方法1 - getInstance() 结果: " + (service != null ? "非空" : "NULL"));
                 
                 if (service != null) {
                     UserError.Log.uel(TAG, "服务类: " + service.getClass().getName());
@@ -329,6 +331,8 @@ public class SendXdripBroadcast {
                         UserError.Log.uel(TAG, "❌ injectBgData 调用异常: " + e.getMessage());
                         e.printStackTrace();
                     }    
+                }
+                /*    
                 } else {
                     // 服务不存在
                     if (retry == 0) {
@@ -346,6 +350,29 @@ public class SendXdripBroadcast {
                         }
                     }
                 }
+                */
+
+                ////////
+                // 方法2：通过应用实例获取
+                UserError.Log.uel(TAG, "尝试方法2：通过xdrip应用实例获取");
+                try {
+                    if (xdrip.getInstance() != null) {
+                        // 检查xdrip.java中是否有绑定的服务
+                        // 注意：这里需要xdrip.java暴露相应的方法
+                        UserError.Log.uel(TAG, "xdrip应用实例存在");
+            
+                        // 如果xdrip.java有getBgDataService()方法
+                        // BgDataService service2 = xdrip.getInstance().getBgDataService();
+                    }
+                } catch (Exception e) {
+                    UserError.Log.uel(TAG, "获取xdrip应用实例失败: " + e.getMessage());
+                }
+    
+                // 方法3：直接启动服务并绑定
+                UserError.Log.uel(TAG, "尝试方法3：直接启动并绑定服务");
+                startAndBindServiceDirectly(bgData);
+                ////////
+                
             } catch (Exception e) {
                 UserError.Log.uel(TAG, "注入服务异常 (重试 " + retry + "): " + 
                 e.getClass().getSimpleName() + ": " + e.getMessage());
@@ -366,6 +393,81 @@ public class SendXdripBroadcast {
             }
         }
     }
+
+    ////////
+/**
+ * 直接启动并绑定服务
+ */
+private static void startAndBindServiceDirectly(BgData bgData) {
+    try {
+        Context context = getAppContext();
+        
+        // 创建ServiceConnection
+        ServiceConnection tempConnection = new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                UserError.Log.uel(TAG, "✅ 临时服务连接成功");
+                
+                try {
+                    // 获取服务实例
+                    BgDataService bgService = BgDataService.getInstance();
+                    if (bgService != null) {
+                        bgService.injectBgData(bgData);
+                        UserError.Log.uel(TAG, "✅ 通过临时连接注入数据成功");
+                    }
+                } catch (Exception e) {
+                    UserError.Log.uel(TAG, "❌ 临时连接注入失败: " + e.getMessage());
+                }
+                
+                // 立即解绑，避免泄漏
+                try {
+                    context.unbindService(this);
+                } catch (Exception e) {
+                    // 忽略解绑异常
+                }
+            }
+            
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+                UserError.Log.uel(TAG, "临时服务连接断开");
+            }
+        };
+        
+        // 启动服务
+        Intent serviceIntent = new Intent(context, BgDataService.class);
+        serviceIntent.setPackage(context.getPackageName());
+        
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent);
+        } else {
+            context.startService(serviceIntent);
+        }
+        
+        // 绑定服务
+        boolean bound = context.bindService(
+            serviceIntent,
+            tempConnection,
+            Context.BIND_AUTO_CREATE | Context.BIND_ABOVE_CLIENT
+        );
+        
+        UserError.Log.uel(TAG, "临时服务绑定结果: " + bound);
+        
+        // 等待服务连接（最多2秒）
+        new Thread(() -> {
+            try {
+                Thread.sleep(2000);
+                // 如果2秒后还没有注入成功，记录日志
+                UserError.Log.uel(TAG, "临时连接超时检查");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
+        
+    } catch (Exception e) {
+        UserError.Log.uel(TAG, "❌ 直接绑定服务失败: " + e.getMessage());
+    }
+}
+    ////////
 
     /**
      * 检查服务是否真正可用（新增辅助方法）
