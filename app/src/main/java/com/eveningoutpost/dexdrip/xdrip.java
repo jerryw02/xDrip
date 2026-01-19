@@ -396,8 +396,25 @@ private void startBgDataServiceImmediately() {
         }
     }
 }
-/////////////////    
-  
+/////////////////
+    public static void startBgDataServiceStatic() {
+        if (instance != null) {
+            instance.startBgDataService();
+        } else {
+            // 备用方案
+            Context context = getAppContext();
+            if (context != null) {
+                Intent intent = new Intent(context, BgDataService.class);
+                intent.setPackage(context.getPackageName());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent);
+                } else {
+                    context.startService(intent);
+                }
+            }
+        }
+    }
+/////////////////        
     
     /**
      * 计划重新连接
