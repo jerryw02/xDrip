@@ -4,11 +4,24 @@ import android.content.Intent;
 import android.content.Context;
 import android.os.Bundle;
 
+// === 新增：添加缺失的 import ===
+import android.content.BroadcastReceiver;      // 添加这个
+import android.content.IntentFilter;           // 添加这个
+import android.content.ComponentName;          // 可能需要
+import android.os.Handler;                     // 可能需要
+import android.os.Looper;                      // 可能需要
+
 import com.eveningoutpost.dexdrip.models.UserError;
 import com.eveningoutpost.dexdrip.BgData;
 import com.eveningoutpost.dexdrip.BgDataService;
 import com.eveningoutpost.dexdrip.xdrip;
 import android.os.RemoteException;
+import android.app.ActivityManager;            // 可能需要
+
+// === 新增：Java 集合类 ===
+import java.util.Queue;                        // 添加这个
+import java.util.LinkedList;                   // 添加这个
+import java.util.List;                         // 可能需要
 
 import static com.eveningoutpost.dexdrip.xdrip.getAppContext;
 
