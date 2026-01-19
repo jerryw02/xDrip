@@ -897,8 +897,7 @@
             xDrip AIDL 服务：供 AAPS 绑定以获取实时血糖数据
             必须 exported="true"，允许其他应用绑定
             且需定义 intent-filter
-        -->
-        <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+        -->        
         <service
             android:name=".BgDataService"
             android:process=":remote"
@@ -915,4 +914,10 @@
         
     </application>
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    
+    <!-- 如果需要在应用间广播，可能需要权限 -->
+    <uses-permission android:name="android.permission.BROADCAST_STICKY" />
+    <!-- 通常应用内广播不需要特殊权限 -->
+    
 </manifest>
