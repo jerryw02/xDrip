@@ -184,7 +184,7 @@ public class xdrip extends Application {
             
             // 启动并绑定BgDataService
             // ✅ 立即启动并绑定服务（不要延迟）
-            startBgDataServiceImmediately();
+            startBgDataService();
             
             if (aidlLogger != null) {
                 aidlLogger.success("AIDL服务初始化完成");
@@ -276,9 +276,9 @@ private void initBgDataServiceConnection() {
 /////////////////  
 
 /**
- * 启动并绑定BgDataService
+ * 启动并绑定BgDataService --- 老版本暂不用
  */
-private void startBgDataService() {
+private void startBgDataServiceOld() {
     if (aidlLogger != null) {
         aidlLogger.step("启动服务", "开始");
     }
@@ -340,7 +340,7 @@ private void startBgDataService() {
 /**
  * 立即启动并绑定服务（改进版）
  */
-private void startBgDataServiceImmediately() {
+private void startBgDataService() {
     if (aidlLogger != null) {
         aidlLogger.step("立即启动服务", "开始");
     }
