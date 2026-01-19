@@ -67,7 +67,7 @@ public class xdrip extends Application {
     private boolean isBgDataServiceBound = false;
     private ServiceConnection bgServiceConnection;
     private com.eveningoutpost.dexdrip.utils.AIDLLogger aidlLogger;
-    //       =============== AIDL 结束 ===============
+    // ====================== AIDL 结束 ======================
 
     public static void setContext(final Context context) {
         if (context == null) return;
@@ -92,7 +92,7 @@ public class xdrip extends Application {
         
         // =============== AIDL 服务初始化（新增） ===============
         initAIDLService();
-        //      =============== AIDL 结束 ===============
+        // ====================== AIDL 结束 =====================
         
         JodaTimeAndroid.init(this);
         try {
@@ -188,119 +188,145 @@ public class xdrip extends Application {
             }
         }
     }
+
+/////////////////
+/**
+ * 初始化BgDataService连接
+ */
+private void initBgDataServiceConnection() {
+    if (aidlLogger != null) {
+        aidlLogger.step("连接初始化", "开始");
+    }
     
-    /**
-     * 初始化BgDataService连接
-     */
-    private void initBgDataServiceConnection() {
-        if (aidlLogger != null) {
-            aidlLogger.step("连接初始化", "开始");
-        }
-        
-        bgServiceConnection = new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder service) {
-                Log.i(TAG, "BgDataService连接成功");
-                if (aidlLogger != null) {
-                    aidlLogger.success("BgDataService连接成功");
-                }
-                
-                isBgDataServiceBound = true;
-                
-                try {
-                    BgDataService.LocalBinder binder = (BgDataService.LocalBinder) service;
-                    bgDataService = binder.getService();
-                    
-                    Log.d(TAG, "获取BgDataService实例: " + (bgDataService != null));
-                    if (aidlLogger != null) {
-                        aidlLogger.debug("获取BgDataService实例: " + (bgDataService != null));
-                    }
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "获取BgDataService失败: " + e.getMessage());
-                    if (aidlLogger != null) {
-                        aidlLogger.error("获取BgDataService失败: " + e.getMessage());
-                    }
-                    isBgDataServiceBound = false;
-                }
+    bgServiceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.i(TAG, "BgDataService连接成功");
+            if (aidlLogger != null) {
+                aidlLogger.success("BgDataService连接成功");
             }
             
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-                Log.w(TAG, "BgDataService连接断开");
+            isBgDataServiceBound = true;
+            
+            try {
+                // ============ 关键修改：移除LocalBinder强制转换 ============
+                // 原来错误代码：
+                // BgDataService.LocalBinder binder = (BgDataService.LocalBinder) service;
+                // bgDataService = binder.getService();
+                
+                // 新代码：直接使用BgDataService.getInstance()
+                bgDataService = BgDataService.getInstance();
+                
+                Log.d(TAG, "获取BgDataService实例: " + (bgDataService != null));
                 if (aidlLogger != null) {
-                    aidlLogger.warn("BgDataService连接断开");
+                    aidlLogger.debug("获取BgDataService实例: " + (bgDataService != null));
                 }
                 
+                // 可选：验证服务是否已启动
+                if (bgDataService != null) {
+                    if (aidlLogger != null) {
+                        aidlLogger.success("BgDataService已成功获取");
+                    }
+                    
+                    // 发送测试数据验证
+                    bgDataService.sendTestData();
+                } else {
+                    if (aidlLogger != null) {
+                        aidlLogger.warn("BgDataService实例为null，可能需要重新绑定");
+                    }
+                }
+                
+            } catch (Exception e) {
+                Log.e(TAG, "获取BgDataService失败: " + e.getMessage(), e);
+                if (aidlLogger != null) {
+                    aidlLogger.error("获取BgDataService失败: " + e.getMessage());
+                }
                 isBgDataServiceBound = false;
-                bgDataService = null;
-                
-                // 尝试重新连接
-                scheduleReconnection();
             }
-        };
-        
-        if (aidlLogger != null) {
-            aidlLogger.step("连接初始化", "完成");
         }
+        
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.w(TAG, "BgDataService连接断开");
+            if (aidlLogger != null) {
+                aidlLogger.warn("BgDataService连接断开");
+            }
+            
+            isBgDataServiceBound = false;
+            bgDataService = null;
+            
+            // 尝试重新连接
+            scheduleReconnection();
+        }
+    };
+    
+    if (aidlLogger != null) {
+        aidlLogger.step("连接初始化", "完成");
+    }
+}
+/////////////////  
+
+/**
+ * 启动并绑定BgDataService
+ */
+private void startBgDataService() {
+    if (aidlLogger != null) {
+        aidlLogger.step("启动服务", "开始");
     }
     
-    /**
-     * 启动并绑定BgDataService
-     */
-    private void startBgDataService() {
+    try {
+        Intent serviceIntent = new Intent(this, BgDataService.class);
+        serviceIntent.putExtra("startup_priority", "high");
+        serviceIntent.putExtra("started_by", "xdrip_application");
+        
+        // ============ 关键修改：移除不必要的标记 ============
+        // 现在onBind总是返回AIDL Binder，不需要特殊标记
+        // serviceIntent.setAction("local"); // 删除这行
+        // serviceIntent.putExtra("internal_call", true); // 删除这行
+        // serviceIntent.putExtra("caller", "xdrip_main_app"); // 删除这行
+        
+        // 只需要设置包名
+        serviceIntent.setPackage(getPackageName());
+        
+        Log.d(TAG, "启动BgDataService");
         if (aidlLogger != null) {
-            aidlLogger.step("启动服务", "开始");
+            aidlLogger.debug("启动BgDataService");
         }
         
-        try {
-            Intent serviceIntent = new Intent(this, BgDataService.class);
-            serviceIntent.putExtra("startup_priority", "high");
-            serviceIntent.putExtra("started_by", "xdrip_application");
-            
-            // ✅ 关键修改：明确标记为内部调用
-            serviceIntent.setAction("local"); // 或者 "internal"
-            serviceIntent.setPackage(getPackageName()); // 设置包名
+        // 启动服务
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
         
-            // 添加额外标记
-            serviceIntent.putExtra("internal_call", true);
-            serviceIntent.putExtra("caller", "xdrip_main_app");
-            
-             // 启动服务
-            Log.d(TAG, "启动BgDataService (标记为内部调用)");
+        // ============ 重要：简化绑定标志 ============
+        // 不需要复杂标志，只需自动创建和重要绑定
+        int bindFlags = Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT;
+        boolean bound = bindService(serviceIntent, bgServiceConnection, bindFlags);
+        
+        if (bound) {
+            Log.i(TAG, "BgDataService绑定已启动");
             if (aidlLogger != null) {
-                aidlLogger.debug("启动BgDataService (标记为内部调用)");
+                aidlLogger.success("BgDataService绑定已启动");
             }
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
-            } else {
-                startService(serviceIntent);
-            }
-            
-            // 绑定服务
-            int bindFlags = Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT;
-            boolean bound = bindService(serviceIntent, bgServiceConnection, bindFlags);
-            
-            if (bound) {
-                Log.i(TAG, "BgDataService绑定已启动");
-                if (aidlLogger != null) {
-                    aidlLogger.success("BgDataService绑定已启动");
-                }
-            } else {
-                Log.e(TAG, "BgDataService绑定失败");
-                if (aidlLogger != null) {
-                    aidlLogger.error("BgDataService绑定失败");
-                }
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "启动BgDataService异常: " + e.getMessage(), e);
+        } else {
+            Log.e(TAG, "BgDataService绑定失败");
             if (aidlLogger != null) {
-                aidlLogger.error("启动BgDataService异常: " + e.getMessage());
+                aidlLogger.error("BgDataService绑定失败");
             }
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "启动BgDataService异常: " + e.getMessage(), e);
+        if (aidlLogger != null) {
+            aidlLogger.error("启动BgDataService异常: " + e.getMessage());
         }
     }
+}
+    
+/////////////////
+  
     
     /**
      * 计划重新连接
@@ -359,6 +385,57 @@ public class xdrip extends Application {
         
         super.onTerminate();
     }
+
+/////////////////
+/**
+ * 检查并确保服务运行
+ */
+public void ensureBgDataServiceRunning() {
+    if (!isBgDataServiceBound || bgDataService == null) {
+        Log.w(TAG, "BgDataService未运行，重新启动");
+        if (aidlLogger != null) {
+            aidlLogger.warn("BgDataService未运行，重新启动");
+        }
+        startBgDataService();
+    }
+}
+
+/**
+ * 手动注入测试数据（用于调试）
+ */
+public void injectTestBgData() {
+    ensureBgDataServiceRunning();
+    
+    if (bgDataService != null) {
+        try {
+            bgDataService.sendTestData();
+            Log.d(TAG, "测试数据注入成功");
+            if (aidlLogger != null) {
+                aidlLogger.success("测试数据注入成功");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "测试数据注入失败: " + e.getMessage());
+            if (aidlLogger != null) {
+                aidlLogger.error("测试数据注入失败: " + e.getMessage());
+            }
+        }
+    } else {
+        Log.e(TAG, "无法注入测试数据：bgDataService为null");
+        if (aidlLogger != null) {
+            aidlLogger.error("无法注入测试数据：bgDataService为null");
+        }
+    }
+}
+
+/**
+ * 获取服务实例的公共方法（供其他模块使用）
+ */
+public BgDataService getBgDataService() {
+    ensureBgDataServiceRunning();
+    return bgDataService;
+}
+/////////////////    
+    
     // =============== AIDL 服务管理方法结束 ===============
 
     public static synchronized boolean isRunningTest() {
