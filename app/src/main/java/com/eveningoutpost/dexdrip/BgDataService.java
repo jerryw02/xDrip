@@ -114,7 +114,7 @@ public class BgDataService extends Service {
         UserError.Log.uel(TAG, "✅ 服务就绪广播已发送");
     }
  
-//////////    
+/*/////////    
     // === 修改：简化onBind方法（关键修改）===
     @Override
     public IBinder onBind(Intent intent) {
@@ -147,7 +147,22 @@ public class BgDataService extends Service {
         
         return binder;
     }
-////////// 
+/////////*/
+//////////
+    @Override
+    public IBinder onBind(Intent intent) {
+        UserError.Log.uel(TAG, "=== onBind() ===");
+        UserError.Log.uel(TAG, "Intent: " + intent);
+        UserError.Log.uel(TAG, "Action: " + intent.getAction());
+        UserError.Log.uel(TAG, "Calling UID: " + Binder.getCallingUid());
+        UserError.Log.uel(TAG, "Calling Package: " + getPackageManager().getNameForUid(Binder.getCallingUid()));
+    
+        // 临时：允许所有绑定请求
+        UserError.Log.uel(TAG, "✅ 临时允许绑定，返回Binder");
+        return binder;
+}
+//////////    
+    
 
     @Override
     public boolean onUnbind(Intent intent) {
