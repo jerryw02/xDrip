@@ -907,8 +907,6 @@
            
             <intent-filter>
                 <action android:name="com.eveningoutpost.dexdrip.BgDataService" />
-                <!-- 可以添加更多 action -->
-                <action android:name="com.eveningoutpost.dexdrip.aidl.BG_DATA_SERVICE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         
