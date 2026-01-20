@@ -4,27 +4,34 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
-import android.app.ActivityManager;  // 新增这个
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
+import android.os.Handler;  // ========== 新增导入 ==========
+import android.os.Looper;   // ========== 新增导入 ==========
 import android.os.IBinder;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import com.eveningoutpost.dexdrip.models.UserError;
 
-// === 修改：删除不必要的import ===
-// import android.content.ComponentName;
-// import android.os.Bundle;
-
 import androidx.core.app.NotificationCompat;
 import com.eveningoutpost.dexdrip.utils.AIDLLogger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentHashMap;  // ========== 新增导入 ==========
+import java.util.Iterator;  // ========== 新增导入 ==========
+import java.util.Map;       // ========== 新增导入 ==========
 
 public class BgDataService extends Service {
     private static final String TAG = "BgDataService";
     private static final String CHANNEL_ID = "xDrip_BgData_Service";
     private static final int NOTIFICATION_ID = 1001;
+    
+    // ========== 新增常量 ==========
+    private static final int HEARTBEAT_INTERVAL = 30000*4; // 30*4秒心跳间隔
+    private static final String HEARTBEAT_TAG = "BgDataService_Heartbeat";
+    private static final long CLIENT_TIMEOUT = 120000*3; // 2*3分钟无活动超时
+    // ==============================
     
     // 日志工具
     private AIDLLogger logger;
@@ -38,11 +45,24 @@ public class BgDataService extends Service {
     // 序列号生成器（用于去重）
     private final AtomicLong sequenceGenerator = new AtomicLong(0);
     
+    // ========== 新增：心跳Handler和客户端活动时间跟踪 ==========
+    private Handler heartbeatHandler;
+    private final Map<IBinder, Long> clientConnectionTime = new ConcurrentHashMap<>();
+    // =====================================================
+    
     // AIDL接口实现
     private final IBgDataService.Stub binder = new IBgDataService.Stub() {
         @Override
         public BgData getLatestBgData() throws RemoteException {
             logger.debug("AAPS请求最新数据");
+            
+            // ========== 新增：更新客户端活动时间 ==========
+            IBinder callingBinder = getCallingBinder();
+            if (callingBinder != null) {
+                clientConnectionTime.put(callingBinder, System.currentTimeMillis());
+            }
+            // ==========================================
+            
             return currentBgData;
         }
         
@@ -53,11 +73,30 @@ public class BgDataService extends Service {
                 int count = callbacks.getRegisteredCallbackCount();
                 logger.success(String.format("AAPS回调注册成功，当前客户端数: %d", count));
                 
+                // ========== 新增：记录客户端活动时间和死亡接收器 ==========
+                clientConnectionTime.put(callback.asBinder(), System.currentTimeMillis());
+                
+                // 添加死亡接收器
+                callback.asBinder().linkToDeath(new IBinder.DeathRecipient() {
+                    @Override
+                    public void binderDied() {
+                        logger.warn("客户端死亡，清理回调");
+                        callbacks.unregister(callback);
+                        clientConnectionTime.remove(callback.asBinder());
+                        updateNotification();
+                    }
+                }, 0);
+                // ====================================================
+                
                 // 立即发送当前数据给新注册的客户端
                 if (currentBgData != null) {
                     callback.onNewBgData(currentBgData);
                     logger.debug("向新客户端发送当前数据");
                 }
+                
+                // ========== 新增：更新通知显示 ==========
+                updateNotification();
+                // =====================================
             }
         }
         
@@ -67,8 +106,39 @@ public class BgDataService extends Service {
                 callbacks.unregister(callback);
                 int count = callbacks.getRegisteredCallbackCount();
                 logger.debug(String.format("AAPS回调注销，剩余客户端数: %d", count));
+                
+                // ========== 新增：清理客户端时间记录 ==========
+                clientConnectionTime.remove(callback.asBinder());
+                // ==========================================
+                
+                // ========== 新增：更新通知显示 ==========
+                updateNotification();
+                // =====================================
             }
         }
+        
+        // ========== 新增：辅助方法获取调用者的Binder ==========
+        private IBinder getCallingBinder() {
+            try {
+                // 尝试从回调列表中获取当前调用者的Binder
+                final int count = callbacks.beginBroadcast();
+                try {
+                    for (int i = 0; i < count; i++) {
+                        IBgDataCallback cb = callbacks.getBroadcastItem(i);
+                        if (cb != null && cb.asBinder().pingBinder()) {
+                            // 这里简化处理，实际可能需要更精确的匹配
+                            return cb.asBinder();
+                        }
+                    }
+                } finally {
+                    callbacks.finishBroadcast();
+                }
+            } catch (Exception e) {
+                logger.error("获取调用者Binder失败: " + e.getMessage());
+            }
+            return null;
+        }
+        // =================================================
         
     };
     
@@ -90,6 +160,10 @@ public class BgDataService extends Service {
         logger.logServiceStatus("BgDataService", "创建");
         logger.step("初始化", "开始");
         
+        // ========== 新增：初始化心跳Handler ==========
+        heartbeatHandler = new Handler(Looper.getMainLooper());
+        // ==========================================
+        
         try {
             // 创建前台服务通知
             createNotificationChannel();
@@ -99,6 +173,10 @@ public class BgDataService extends Service {
             
             // === 新增：发送服务就绪广播 ===
             sendServiceReadyBroadcast();
+            
+            // ========== 新增：启动心跳机制 ==========
+            startHeartbeat();
+            // =====================================
             
         } catch (Exception e) {
             logger.error("BgDataService启动失败: " + e.getMessage());
@@ -113,42 +191,7 @@ public class BgDataService extends Service {
         sendBroadcast(intent);
         UserError.Log.uel(TAG, "✅ 服务就绪广播已发送");
     }
- 
-/*/////////    
-    // === 修改：简化onBind方法（关键修改）===
-    @Override
-    public IBinder onBind(Intent intent) {
-        logger.step("服务绑定", "开始");
-        
-        // 记录调用者信息
-        int callingUid = Binder.getCallingUid();
-        try {
-            String[] packages = getPackageManager().getPackagesForUid(callingUid);
-            if (packages != null && packages.length > 0) {
-                String callingPackage = packages[0];
-                logger.debug("调用者包名: " + callingPackage);
-                logger.debug("调用者UID: " + callingUid);
-                
-                // 区分调用者用于日志，但不影响返回的Binder
-                if (callingPackage.equals(getPackageName())) {
-                    logger.debug("调用者: xdrip自身");
-                } else {
-                    logger.debug("调用者: 外部应用 - " + callingPackage);
-                }
-            }
-        } catch (Exception e) {
-            logger.warn("获取调用者信息失败: " + e.getMessage());
-        }
-        
-        // === 核心修改：总是返回AIDL Binder ===
-        logger.success("返回AIDL Binder");
-        logger.debug("Binder类型: " + binder.getClass().getName());
-        logger.debug("实现接口: IBgDataService.Stub");
-        
-        return binder;
-    }
-/////////*/
-//////////
+
     @Override
     public IBinder onBind(Intent intent) {
         UserError.Log.uel(TAG, "=== onBind() ===");
@@ -159,35 +202,178 @@ public class BgDataService extends Service {
     
         // 临时：允许所有绑定请求
         UserError.Log.uel(TAG, "✅ 临时允许绑定，返回Binder");
+              
+        // ========== 新增：记录绑定时间 ==========
+        // 注意：这里记录的是binder的绑定，不是callback的注册
+        // 实际客户端活动时间在registerCallback中记录更准确
+        clientConnectionTime.put(binder, System.currentTimeMillis());
+        // =====================================
+        
         return binder;
-}
-//////////    
+    }
     
-
     @Override
     public boolean onUnbind(Intent intent) {
         logger.debug("所有客户端解除绑定");
+        
+        // ========== 新增：清理所有客户端时间记录 ==========
+        clientConnectionTime.clear();
+        // ============================================
+        
         return true;
     }
     
     @Override
     public void onDestroy() {
-
+        // ========== 新增：停止心跳机制 ==========
+        stopHeartbeat();
+        // =====================================
+        
         // 清理1：清除静态引用，防止内存泄漏
-        instance = null;  // ✅ 必须做，让GC可以回收这个服务实例
+        instance = null;
+        
+        // ========== 新增：清理客户端时间记录 ==========
+        clientConnectionTime.clear();
+        // ============================================
         
         logger.logServiceStatus("BgDataService", "销毁");
         
         // 清理2：释放客户端回调资源
-        callbacks.kill(); // ✅ 必须做，清理RemoteCallbackList内部资源
+        callbacks.kill();
+        
+        // ========== 新增：清理Handler ==========
+        if (heartbeatHandler != null) {
+            heartbeatHandler.removeCallbacksAndMessages(null);
+        }
+        // =====================================
         
         super.onDestroy();
     }
     
+    // ========== 新增方法：心跳机制 ==========
+    /**
+     * 启动心跳，保持AIDL连接活跃
+     * 原因：防止Android系统因空闲而断开AIDL连接
+     */
+    private void startHeartbeat() {
+        if (heartbeatHandler != null) {
+            // 延迟5秒开始第一次心跳，避免启动时立即发送
+            heartbeatHandler.postDelayed(this::sendHeartbeat, 5000);
+            logger.debug("心跳机制已启动，间隔：" + HEARTBEAT_INTERVAL + "ms");
+        }
+    }
+    
+    /**
+     * 停止心跳
+     */
+    private void stopHeartbeat() {
+        if (heartbeatHandler != null) {
+            heartbeatHandler.removeCallbacks(this::sendHeartbeat);
+            logger.debug("心跳机制已停止");
+        }
+    }
+    
+    /**
+     * 发送心跳数据
+     */
+    private void sendHeartbeat() {
+        final int count = callbacks.beginBroadcast();
+        try {
+            if (count > 0) {
+                // 创建心跳数据
+                BgData heartbeatData = new BgData();
+                heartbeatData.setTimestamp(System.currentTimeMillis());
+                heartbeatData.setSequenceNumber(sequenceGenerator.incrementAndGet());
+                heartbeatData.setSource("xDrip_Heartbeat");
+                
+                // 如果有最新数据，包含在心跳中
+                if (currentBgData != null) {
+                    heartbeatData.setGlucoseValue(currentBgData.getGlucoseValue());
+                    heartbeatData.setTrend(currentBgData.getTrend());
+                    heartbeatData.setDirection(currentBgData.getDirection());
+                }
+                
+                int successCount = 0;
+                int failCount = 0;
+                
+                for (int i = 0; i < count; i++) {
+                    try {
+                        IBgDataCallback callback = callbacks.getBroadcastItem(i);
+                        callback.onNewBgData(heartbeatData);
+                        successCount++;
+                        
+                        // 更新客户端活动时间
+                        clientConnectionTime.put(callback.asBinder(), System.currentTimeMillis());
+                        
+                    } catch (RemoteException e) {
+                        failCount++;
+                        logger.warn(HEARTBEAT_TAG + "心跳发送失败给客户端 " + i + ": " + e.getMessage());
+                    }
+                }
+                
+                logger.debug(HEARTBEAT_TAG + "心跳发送结果: 成功=" + successCount + ", 失败=" + failCount);
+                
+                // 清理超时客户端
+                cleanupTimeoutClients();
+                
+            } else {
+                logger.debug(HEARTBEAT_TAG + "无活跃客户端，跳过心跳");
+            }
+        } finally {
+            callbacks.finishBroadcast();
+        }
+        
+        // 安排下一次心跳
+        if (heartbeatHandler != null) {
+            heartbeatHandler.postDelayed(this::sendHeartbeat, HEARTBEAT_INTERVAL);
+        }
+    }
+    
+    /**
+     * 清理超时未活动的客户端
+     */
+    private void cleanupTimeoutClients() {
+        long currentTime = System.currentTimeMillis();
+        int removedCount = 0;
+        
+        Iterator<Map.Entry<IBinder, Long>> iterator = clientConnectionTime.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<IBinder, Long> entry = iterator.next();
+            long lastActivity = entry.getValue();
+            
+            if (currentTime - lastActivity > CLIENT_TIMEOUT) {
+                iterator.remove();
+                removedCount++;
+                
+                logger.debug("清理超时客户端: " + entry.getKey().hashCode());
+                
+                // 尝试从callbacks中移除（如果存在）
+                // 注意：RemoteCallbackList的管理更复杂，这里主要清理时间记录
+            }
+        }
+        
+        if (removedCount > 0) {
+            logger.info("清理了 " + removedCount + " 个超时客户端记录");
+            updateNotification();
+        }
+    }
+    
+    /**
+     * 尝试重新连接（如果检测到连接问题）
+     */
+    private void attemptReconnect() {
+        logger.debug("尝试触发客户端重连");
+        
+        // 发送服务状态广播
+        Intent intent = new Intent("com.eveningoutpost.dexdrip.SERVICE_RECONNECT");
+        sendBroadcast(intent);
+    }
+    // ==============================================
+    
     /**
      * 核心方法：注入新的血糖数据
      */
-    public void injectBgData(BgData newData) { // ✅ public方法
+    public void injectBgData(BgData newData) {
         if (newData == null) {
             logger.error("注入数据为空");
             return;
@@ -211,11 +397,32 @@ public class BgDataService extends Service {
         // 更新当前数据
         currentBgData = newData;
         
+        // ========== 新增：更新所有客户端的活动时间 ==========
+        long currentTime = System.currentTimeMillis();
+        final int count = callbacks.beginBroadcast();
+        try {
+            for (int i = 0; i < count; i++) {
+                try {
+                    IBgDataCallback callback = callbacks.getBroadcastItem(i);
+                    clientConnectionTime.put(callback.asBinder(), currentTime);
+                } catch (Exception e) {
+                    // 忽略个别错误
+                }
+            }
+        } finally {
+            callbacks.finishBroadcast();
+        }
+        // ================================================
+        
         // 通知所有客户端
         notifyClients(newData);
         
         logger.success("数据注入完成");
         logger.debug("当前数据: " + newData.toString());
+        
+        // ========== 新增：更新通知 ==========
+        updateNotification();
+        // ================================
     }
     
     /**
@@ -295,15 +502,45 @@ public class BgDataService extends Service {
      * 创建前台服务通知
      */
     private Notification createNotification() {
+        // ========== 修改：计算活跃客户端数 ==========
+        int activeClients = 0;
+        long currentTime = System.currentTimeMillis();
+        for (Long lastActivity : clientConnectionTime.values()) {
+            if (currentTime - lastActivity < 60000) { // 1分钟内活跃
+                activeClients++;
+            }
+        }
+        
+        String contentText = "为AAPS提供实时血糖数据";
+        if (activeClients > 0) {
+            contentText += " (" + activeClients + "个活跃客户端)";
+        } else {
+            contentText += " (等待连接...)";
+        }
+        // ========================================
+        
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("xDrip AIDL服务运行中")
-            .setContentText("为AAPS提供实时血糖数据")
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW);
         
         logger.debug("创建前台服务通知");
         return builder.build();
+    }
+    
+    /**
+     * 更新通知（新增方法）
+     */
+    private void updateNotification() {
+        if (instance != null) {
+            NotificationManager notificationManager = 
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (notificationManager != null) {
+                notificationManager.notify(NOTIFICATION_ID, createNotification());
+            }
+        }
     }
     
     /**
@@ -359,17 +596,15 @@ public class BgDataService extends Service {
         startService(restartService);
         super.onTaskRemoved(rootIntent);
     }
-
+  
     // === 修改：添加简单的测试方法 ===
     public void sendTestData() {
         BgData testData = new BgData();
         testData.setGlucoseValue(120.0);
         testData.setTimestamp(System.currentTimeMillis());
-        //testData.setTrend("→");
         testData.setSequenceNumber(sequenceGenerator.incrementAndGet());
         
         injectBgData(testData);
         logger.debug("发送测试数据完成");
     }
-    
 }
