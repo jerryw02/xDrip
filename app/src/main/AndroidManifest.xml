@@ -902,8 +902,8 @@
             android:name=".BgDataService"
             android:exported="true"
             android:enabled="true"
-            android:foregroundServiceType="dataSync"
-            android:permission="android.permission.BIND_JOB_SERVICE">
+            android:foregroundServiceType="dataSync">
+            <!-- 移除 permission 属性，让任何应用都可以绑定 -->
            
             <intent-filter>
                 <action android:name="com.eveningoutpost.dexdrip.BgDataService" />
