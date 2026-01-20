@@ -28,9 +28,9 @@ public class BgDataService extends Service {
     private static final int NOTIFICATION_ID = 1001;
     
     // ========== 新增常量 ==========
-    private static final int HEARTBEAT_INTERVAL = 30000; // 30秒心跳间隔
+    private static final int HEARTBEAT_INTERVAL = 30000*4; // 30*4秒心跳间隔
     private static final String HEARTBEAT_TAG = "BgDataService_Heartbeat";
-    private static final long CLIENT_TIMEOUT = 120000; // 2分钟无活动超时
+    private static final long CLIENT_TIMEOUT = 120000*3; // 2*3分钟无活动超时
     // ==============================
     
     // 日志工具
