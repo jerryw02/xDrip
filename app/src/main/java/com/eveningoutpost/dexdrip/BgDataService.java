@@ -202,12 +202,7 @@ public class BgDataService extends Service {
     
         // 临时：允许所有绑定请求
         UserError.Log.uel(TAG, "✅ 临时允许绑定，返回Binder");
-
-        // ========== 修改：删除错误的心跳启动代码 ==========
-        // 原错误代码：handler.postDelayed(heartbeatRunnable, 30000);
-        // 现在心跳在 startHeartbeat() 中统一管理
-        // =============================================
-        
+              
         // ========== 新增：记录绑定时间 ==========
         // 注意：这里记录的是binder的绑定，不是callback的注册
         // 实际客户端活动时间在registerCallback中记录更准确
@@ -601,35 +596,7 @@ public class BgDataService extends Service {
         startService(restartService);
         super.onTaskRemoved(rootIntent);
     }
-
-    // ========== 删除旧的错误心跳代码段 ==========
-    // 删除以下代码（如果存在）：
-    /*
-    // 添加心跳机制
-    private final Runnable heartbeatRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (callback != null) {
-                try {
-                    // 发送心跳数据或空数据保持连接
-                    BgData heartbeatData = new BgData();
-                    heartbeatData.setTimestamp(System.currentTimeMillis());
-                    callback.onNewBgData(heartbeatData);
-                
-                    UserError.Log.uel(TAG, "Heartbeat sent to keep connection alive");
-                } catch (RemoteException e) {
-                    UserError.Log.uel(TAG, "Heartbeat failed, client may have disconnected", e);
-                    callback = null;
-                }
-            }
-        
-            // 每30秒发送一次心跳
-            handler.postDelayed(this, 30000);
-        }
-    };
-    */
-    // =========================================
-
+  
     // === 修改：添加简单的测试方法 ===
     public void sendTestData() {
         BgData testData = new BgData();
