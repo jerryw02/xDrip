@@ -27,3 +27,13 @@ jobs:
         arguments: assembleProdRelease testProdReleaseUnitTest
     - name: Check Output
       run: bash ./etc/CheckBuild/check-release.sh test
+     
+     # 3. 关键：强制使用最新的 upload-artifact
+    - name: Upload APK
+      # 强制锁定版本
+      uses: actions/upload-artifact@v4
+      with:
+        name: xDrip-Apk
+        path: app/build/outputs/apk/prod/debug/*.apk
+        # 如果文件路径不存在也不要报错，防止卡住
+        if-no-files-found: warn 
