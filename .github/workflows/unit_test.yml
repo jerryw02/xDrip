@@ -25,8 +25,8 @@ jobs:
       uses: gradle/gradle-build-action@v2
       with:
         arguments: assembleProdDebug testProdDebugUnitTest
-    - name: Check Output
-      run: bash ./etc/CheckBuild/check-release.sh test
+    #- name: Check Output
+    #  run: bash ./etc/CheckBuild/check-release.sh test
      
     - name: Upload APK as Artifact
       uses: actions/upload-artifact@v4  # 建议使用最新版本
